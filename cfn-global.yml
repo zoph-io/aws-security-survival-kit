@@ -1,0 +1,179 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Description: aws-security-survival-kit alerting - global events - https://zoph.io
+###########################################################
+Parameters:
+  ###########################################################
+  AlarmRecipient:
+    Type: String
+    AllowedPattern: "^[\\x20-\\x45]?[\\w-\\+]+(\\.[\\w]+)*@[\\w-]+(\\.[\\w]+)*(\\.[a-z]{2,})$"
+    ConstraintDescription: Email address required.
+    Description: Alarm recipient email address
+  Project:
+    Type: String
+    Description: Project Name
+###############################################################################
+
+###########################################################
+Resources:
+  ###########################################################
+
+  EventsRuleRootSignIn:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: !Sub "[${Project}] Monitor root AWS Console sign-in events"
+      EventPattern:
+        detail-type:
+          - AWS Console Sign In via CloudTrail
+        detail:
+          userIdentity:
+            type:
+              - Root
+      Name:
+        Fn::Sub: "${AWS::StackName}-RootActivityRule"
+      State: ENABLED
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+
+  EventRuleCTChange:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: "detect-cloudtrail-changes"
+      Description: !Sub "[${Project}] Monitor change on CloudTrail setup"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "cloudtrail.amazonaws.com"
+          eventName:
+            - "StopLogging"
+            - "DeleteTrail"
+            - "UpdateTrail"
+
+  EventRuleHealth:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: "detect-aws-health-events"
+      Description: !Sub "[${Project}] Monitor AWS Health Dashboard events"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+      EventPattern:
+        detail-type:
+          - "AWS Health Event"
+        source:
+          - "aws.health"
+
+  EventRuleIAMUsers:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: "detect-iam-user-changes"
+      Description: !Sub "[${Project}] Monitor IAM Users changes"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "iam.amazonaws.com"
+          eventName:
+            - "AddUserToGroup"
+            - "ChangePassword"
+            - "CreateAccessKey"
+            - "DeleteAccessKey"
+            - "CreateUser"
+            - "DeleteUser"
+            - "UpdateAccessKey"
+            - "UpdateGroup"
+            - "UpdateUser"
+            - "AttachGroupPolicy"
+            - "AttachUserPolicy"
+            - "DeleteUserPolicy"
+            - "DetachGroupPolicy"
+            - "DetachUserPolicy"
+            - "PutUserPolicy"
+
+  EventRuleMFAChanges:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: "detect-iam-mfa-changes"
+      Description: !Sub "[${Project}] Monitor MFA Changes"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "iam.amazonaws.com"
+          eventName:
+            - "CreateVirtualMFADevice"
+            - "DeactivateMFADevice"
+            - "DeleteVirtualMFADevice"
+            - "EnableMFADevice"
+            - "ResyncMFADevice"
+
+  CtAlertingTopic:
+    # https://aws.amazon.com/premiumsupport/knowledge-center/cloudwatch-receive-sns-for-alarm-trigger/
+    Type: "AWS::SNS::Topic"
+    Properties:
+      DisplayName: !Sub "[${AWS::AccountId}] Security Alarm"
+      TopicName: !Sub "${Project}-alarm-topic-${AWS::Region}"
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlarmRecipient
+      Tags:
+        - Key: "Project"
+          Value: !Ref Project
+
+  SnsTopicPolicy:
+    Type: "AWS::SNS::TopicPolicy"
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Sid: "__default_statement_ID"
+            Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action:
+              - "sns:GetTopicAttributes"
+              - "sns:SetTopicAttributes"
+              - "sns:AddPermission"
+              - "sns:RemovePermission"
+              - "sns:DeleteTopic"
+              - "sns:Subscribe"
+              - "sns:ListSubscriptionsByTopic"
+              - "sns:Publish"
+              - "sns:Receive"
+            Resource:
+              Ref: CtAlertingTopic
+            Condition:
+              StringEquals:
+                AWS:SourceOwner:
+                  Ref: "AWS::AccountId"
+          - Sid: "CWEvents"
+            Effect: "Allow"
+            Principal:
+              Service: "events.amazonaws.com"
+            Action: "sns:Publish"
+            Resource:
+              Ref: CtAlertingTopic
+      Topics:
+        - Ref: CtAlertingTopic

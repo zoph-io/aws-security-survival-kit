@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Description: aws-security-survival-kit alerting - local events - https://zoph.io
+###########################################################
+Parameters:
+  ###########################################################
+  AlarmRecipient:
+    Type: String
+    AllowedPattern: "^[\\x20-\\x45]?[\\w-\\+]+(\\.[\\w]+)*@[\\w-]+(\\.[\\w]+)*(\\.[a-z]{2,})$"
+    ConstraintDescription: Email address required.
+    Description: Alarm recipient email address
+  CTLogGroupName:
+    Type: String
+    Description: CloudTrail LogGroup
+  Project:
+    Type: String
+    Description: Project Name
+
+###############################################################################
+
+###########################################################
+Resources:
+  ###########################################################
+
+  EventRuleCTChange:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: "detect-cloudtrail-changes"
+      Description: "Monitor change on CloudTrail setup"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "cloudtrail.amazonaws.com"
+          eventName:
+            - "StopLogging"
+            - "DeleteTrail"
+            - "UpdateTrail"
+
+  CloudWatchLogsMetricsFilterAccessDenied:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterPattern: '{ ($.errorCode = "*UnauthorizedOperation") || ($.errorCode = "AccessDenied*") }'
+      LogGroupName: !Ref CTLogGroupName
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "CloudTrailMetrics"
+          MetricName: "UnauthorizedAttemptCount"
+          DefaultValue: 0
+
+  AlarmAccessDenied:
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      ActionsEnabled: true
+      AlarmName: !Sub "Unauthorized API Call"
+      AlarmActions:
+        - !Ref CtAlertingTopic
+      AlarmDescription: >
+        Alarm on Unauthorized API Call
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 2
+      MetricName: "UnauthorizedAttemptCount"
+      Namespace: "CloudTrailMetrics"
+      Period: 3600
+      Statistic: Sum
+      Threshold: 1
+      TreatMissingData: "notBreaching"
+
+  AlarmConsoleFailedAuth:
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      AlarmName: "Failed Console Login"
+      AlarmDescription: "Failed Console Login"
+      MetricName: "ConsoleLoginFailures"
+      Namespace: "CloudTrailMetrics"
+      Statistic: "Sum"
+      Period: "300"
+      EvaluationPeriods: "1"
+      Threshold: "1"
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      AlarmActions:
+        - !Ref CtAlertingTopic
+      TreatMissingData: "notBreaching"
+
+  CloudWatchLogsMetricsFilterConsoleFailedAuth:
+    Type: "AWS::Logs::MetricFilter"
+    Properties:
+      LogGroupName: !Ref CTLogGroupName
+      FilterPattern: '{ ($.eventName = ConsoleLogin) && ($.errorMessage = "Failed authentication") }'
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "CloudTrailMetrics"
+          MetricName: "ConsoleLoginFailures"
+
+  CtAlertingTopic:
+    # https://aws.amazon.com/premiumsupport/knowledge-center/cloudwatch-receive-sns-for-alarm-trigger/
+    Type: "AWS::SNS::Topic"
+    Properties:
+      DisplayName: !Sub "[${AWS::AccountId}] Security Alarm"
+      TopicName: !Sub "${Project}-alarm-topic-${AWS::Region}"
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlarmRecipient
+      Tags:
+        - Key: "Project"
+          Value: !Ref Project
+
+  SnsTopicPolicy:
+    Type: "AWS::SNS::TopicPolicy"
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Sid: "__default_statement_ID"
+            Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action:
+              - "sns:GetTopicAttributes"
+              - "sns:SetTopicAttributes"
+              - "sns:AddPermission"
+              - "sns:RemovePermission"
+              - "sns:DeleteTopic"
+              - "sns:Subscribe"
+              - "sns:ListSubscriptionsByTopic"
+              - "sns:Publish"
+              - "sns:Receive"
+            Resource:
+              Ref: CtAlertingTopic
+            Condition:
+              StringEquals:
+                AWS:SourceOwner:
+                  Ref: "AWS::AccountId"
+          - Sid: "CWEvents"
+            Effect: "Allow"
+            Principal:
+              Service: "events.amazonaws.com"
+            Action: "sns:Publish"
+            Resource:
+              Ref: CtAlertingTopic
+      Topics:
+        - Ref: CtAlertingTopic
