@@ -43,6 +43,51 @@ Resources:
             - "DeleteTrail"
             - "UpdateTrail"
 
+  EventRuleExfilDisk:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: "detect-disk-exfiltration"
+      Description: "Detect exfiltration on EBS Snapshot or AMI (sharing)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+      EventPattern:
+        source:
+          - aws.ec2
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "ec2.amazonaws.com"
+          eventName:
+            - "ModifySnapshotAttribute"
+            - "ModifyImageAttribute"
+            - "SharedSnapshotCopyInitiated"
+            - "SharedSnapshotVolumeCreated"
+
+  EventRuleStsWhoAmI:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: "detect-sts-whoami"
+      Description: "Detect STS get-caller-identity"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+      EventPattern:
+        source:
+          - aws.sts
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "sts.amazonaws.com"
+          eventName:
+            - "GetCallerIdentity"
+
   CloudWatchLogsMetricsFilterAccessDenied:
     Type: AWS::Logs::MetricFilter
     Properties:

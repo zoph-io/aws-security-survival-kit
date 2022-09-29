@@ -18,7 +18,10 @@ Using this kit, you will deploy CloudWatch EventRules and CW alarms on all suspe
 4. IAM Users Changes (`Create`, `Delete`, `Update`, `CreateAccessKey`, etc..)
 5. MFA Monitoring (`CreateVirtualMFADevice` `DeactivateMFADevice` `DeleteVirtualMFADevice`, etc..)
 6. Unauthorized Operations (`Access Denied`, `UnauthorizedOperation`)
-7. Failed AWS Console login authentication
+7. Failed AWS Console login authentication (`ConsoleLoginFailures`)
+8. EBS Snapshots Exfiltration (`ModifySnapshotAttribute`, `SharedSnapshotCopyInitiated` `SharedSnapshotVolumeCreated`)
+9. AMI Exfiltration (`ModifyImageAttribute`)
+10. Who Am I Calls (`GetCallerIdentity`)
 
 ## :keyboard: Usage
 
