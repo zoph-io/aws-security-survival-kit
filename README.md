@@ -1,16 +1,18 @@
 # 🚑 AWS Security Survival Kit
 
-## :brain: Rational
+## :brain: Rationale
 
-This AWS Security Survival Kit will allow you to set up minimal alerting on typical suspicious activities on your AWS Account.
+This AWS Security Survival Kit sets up a basic proactive monitoring and alerting environment on common suspicious activities in your AWS Account.
 
-You all know that [CloudTrail](https://aws.amazon.com/cloudtrail/) is now the bare minimum service to activate on a newly created AWS Account to track all activities on your AWS account. It is nice, but suspicious activities will not come from themself to you. You still have to check periodically if something goes wrong in multiple services and console.
+We know that [CloudTrail](https://aws.amazon.com/cloudtrail/) is the bare minimum service to activate on a newly created AWS Account to track all activities on your AWS account. It helps, but this will not alert you to suspicious activities by itself. You still have to check periodically if something has gone wrong in multiple services and the console.
 
-With these CloudFormation templates, you will bring security observability to your AWS account, it's complementary to the GuardDuty service (There are no built-in alerts on GuardDuty).
+With these CloudFormation templates, you will bring proactive security monitoring and alerting to your AWS account. It's complementary to the GuardDuty service as there are no built-in alerts on GuardDuty.
 
 ## 💾 Suspicious Activities
 
-Using this kit, you will deploy CloudWatch EventRules and CW alarms on all suspect activities below:
+Using this kit, you will deploy EventBridge (CloudWatch Event) Rules and CloudWatch Metric Filters and Alarms on select suspicious activities.
+
+The following suspicious activities are currently supported:
 
 1. Root User activities
 2. CloudTrail changes (`StopLogging`, `DeleteTrail`, `UpdateTrail`)
@@ -27,15 +29,17 @@ Using this kit, you will deploy CloudWatch EventRules and CW alarms on all suspe
 
 ### Parameters
 
-- `AlarmRecipient`: Recipient for the alerts (ie: hello@zoph.io)
-- `Project`: Name of the Project (ie: aws-security-survival-kit)
-- `Description`: Description of the Project (ie: Bare minimum ...)
-- `LocalAWSRegion`: Region where your workloads and CloudTrail are located (ie: `eu-west-1`)
+- `AlarmRecipient`: Recipient for the alerts (e.g.: hello@zoph.io)
+- `Project`: Name of the Project (e.g.: aws-security-survival-kit)
+- `Description`: Description of the Project (e.g.: Bare minimum ...)
+- `LocalAWSRegion`: Region where your workloads and CloudTrail are located (e.g.: `eu-west-1`)
 - `CTLogGroupName`: Cloudtrail CloudWatch LogGroup name
 
 Setup the correct parameters in the `Makefile`, then run the following command:
 
     $ make deploy
+
+### :robot: ChatOps
 
 Setup [AWS Chatbot](https://aws.amazon.com/chatbot/) for best experience to get notified directly on Slack.
 
