@@ -143,6 +143,32 @@ Resources:
           MetricNamespace: "CloudTrailMetrics"
           MetricName: "ConsoleLoginFailures"
 
+  AlarmIMDSv1RunInstance:
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      AlarmName: "IMDSv1 RunInstance Detected"
+      AlarmDescription: "IMDSv1 RunInstance Detected"
+      MetricName: "IMDSv1RunInstance"
+      Namespace: "CloudTrailMetrics"
+      Statistic: "Sum"
+      Period: "300"
+      EvaluationPeriods: "1"
+      Threshold: "1"
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      AlarmActions:
+        - !Ref CtAlertingTopic
+      TreatMissingData: "notBreaching"
+
+  CloudWatchLogsMetricsFilterIMDSv1:
+    Type: "AWS::Logs::MetricFilter"
+    Properties:
+      LogGroupName: !Ref CTLogGroupName
+      FilterPattern: '{ ($.eventName = RunInstances) && ($.responseElements.instancesSet.items[0].metadataOptions.httpTokens = "optional") }'
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "CloudTrailMetrics"
+          MetricName: "IMDSv1RunInstance"
+
   CtAlertingTopic:
     # https://aws.amazon.com/premiumsupport/knowledge-center/cloudwatch-receive-sns-for-alarm-trigger/
     Type: "AWS::SNS::Topic"
