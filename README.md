@@ -24,7 +24,7 @@ The following suspicious activities are currently supported:
 8. EBS Snapshots Exfiltration (`ModifySnapshotAttribute`, `SharedSnapshotCopyInitiated` `SharedSnapshotVolumeCreated`)
 9. AMI Exfiltration (`ModifyImageAttribute`)
 10. Who Am I Calls (`GetCallerIdentity`)
-11. IMDSv1 RunInstances (`RunInstances` && `optinal` http tokens)
+11. IMDSv1 RunInstances (`RunInstances` && `optional` http tokens)
 
 ## :keyboard: Usage
 
