@@ -2,7 +2,7 @@
 
 ## :brain: Rationale
 
-This AWS Security Survival Kit sets up a basic proactive monitoring and alerting environment on common suspicious activities in your AWS Account.
+This AWS Security Survival Kit (ASSK) sets up a basic proactive monitoring and alerting environment on common suspicious activities in your AWS Account.
 
 We know that [CloudTrail](https://aws.amazon.com/cloudtrail/) is the bare minimum service to activate on a newly created AWS Account to track all activities on your AWS account. It helps, but this will not alert you to suspicious activities by itself. You still have to check periodically if something has gone wrong in multiple services and the console.
 
@@ -10,7 +10,7 @@ With these CloudFormation templates, you will bring proactive security monitorin
 
 ## 💾 Suspicious Activities
 
-Using this kit, you will deploy EventBridge (CloudWatch Event) Rules and CloudWatch Metric Filters and Alarms on select suspicious activities.
+Using this kit, you will deploy EventBridge (CloudWatch Event) Rules and CloudWatch Metric Filters and Alarms on select suspicious activities. It comes with a CloudWatch Dashboard to give you more insights about what is ringing 🔔
 
 The following suspicious activities are currently supported:
 
@@ -46,6 +46,12 @@ Setup [AWS Chatbot](https://aws.amazon.com/chatbot/) for best experience to get 
 
 ![Slack Alerts](./assets/slack-alert03.png)
 ![Slack Alerts](./assets/slack-alert02.png)
+
+### 📈 Dashboard
+
+ASSK comes with a CloudWatch Dashboard, please don't hesitate to adjust to your needs.
+
+![dashboard](assets/dashboard.png)
 
 ## :man_technologist: Credits
 

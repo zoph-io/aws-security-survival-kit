@@ -25,6 +25,7 @@ deploy:
 		--stack-name "${Project}-local" \
 		--parameter-overrides \
 			Project=${Project} \
+			Region=${LocalAWSRegion} \
 			AlarmRecipient=${AlarmRecipient} \
 			CTLogGroupName=${CTLogGroupName} \
 		--no-fail-on-empty-changeset
