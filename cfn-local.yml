@@ -15,12 +15,22 @@ Parameters:
   Project:
     Type: String
     Description: Project Name
+  Region:
+    Type: String
+    Description: AWS Region
 
 ###############################################################################
 
 ###########################################################
 Resources:
   ###########################################################
+
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: "AWS-Security-Survival-Kit-Dashboard"
+      DashboardBody: !Sub |
+        {"widgets": [{ "height": 12, "width": 24, "y": 0, "x": 0, "type": "log", "properties": { "query": "SOURCE '${CTLogGroupName}' | fields eventTime, eventName, eventSource, userIdentity.sessionContext.sessionIssuer.userName as Principal, userIdentity.invokedBy as InvokedBy, errorCode\n\n\n\n | filter errorCode like /(Client.UnauthorizedOperation|AccessDenied)/", "region": "${Region}", "title": "Latest AccessDenied from CT", "view": "table" } }, { "height": 6, "width": 24, "y": 12, "x": 0, "type": "log", "properties": { "query": "SOURCE '${CTLogGroupName}' | fields eventTime, eventName, eventSource, userIdentity.sessionContext.sessionIssuer.userName as Principal, userIdentity.invokedBy as InvokedBy, responseElements.instancesSet.items.0.metadataOptions.httpTokens as IMDSv2\n\n | filter eventName like \"RunInstances\" and IMDSv2 like \"optional\"", "region": "${Region}", "title": "IMDSv1 RunInstances", "view": "table" } } ] }
 
   EventRuleCTChange:
     Type: "AWS::Events::Rule"
