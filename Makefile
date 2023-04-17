@@ -11,7 +11,7 @@ help:
 	@echo "	clean - clean temp folders"
 
 ###################### Parameters ######################
-AlarmRecipient ?= "hello@zoph.io"
+AlarmRecipient ?= "changeme@domain.com"
 Project ?= aws-security-survival-kit
 Description ?= Bare minimum AWS Security alerting
 LocalAWSRegion ?= eu-west-1
