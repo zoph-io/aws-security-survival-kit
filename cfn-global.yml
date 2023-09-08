@@ -40,7 +40,7 @@ Resources:
   EventRuleCTChange:
     Type: "AWS::Events::Rule"
     Properties:
-      Name: "detect-cloudtrail-changes"
+      Name: "detect-cloudtrail-changes-global"
       Description: !Sub "[${Project}] Monitor change on CloudTrail setup"
       State: "ENABLED"
       Targets:
@@ -135,7 +135,7 @@ Resources:
     Type: "AWS::SNS::Topic"
     Properties:
       DisplayName: !Sub "[${AWS::AccountId}] Security Alarm"
-      TopicName: !Sub "${Project}-alarm-topic-${AWS::Region}"
+      TopicName: !Sub "${Project}-alarm-topic-${AWS::Region}-global"
       Subscription:
         - Protocol: email
           Endpoint: !Ref AlarmRecipient
