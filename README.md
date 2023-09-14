@@ -8,6 +8,14 @@ We know that [CloudTrail](https://aws.amazon.com/cloudtrail/) is the bare minimu
 
 With these CloudFormation templates, you will bring proactive security monitoring and alerting to your AWS account. It's complementary to the GuardDuty service as there are no built-in alerts on GuardDuty.
 
+## ✅ Secure by Default
+
+This kit will also enable the following default security configuration to your AWS Account.
+
+1. EBS Volumes Default Encryption (Region level)
+2. S3 Block Public Access (Account level)
+3. AMI Block Public Sharing (Account level)
+
 ## 💾 Suspicious Activities
 
 Using this kit, you will deploy EventBridge (CloudWatch Event) Rules and CloudWatch Metric Filters and Alarms on select suspicious activities. It comes with a CloudWatch Dashboard to give you more insights about what is ringing 🔔
