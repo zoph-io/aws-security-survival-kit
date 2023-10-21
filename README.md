@@ -14,7 +14,7 @@ This kit will also enable the following default security configuration to your A
 
 1. EBS Volumes Default Encryption (Region level)
 2. S3 Block Public Access (Account level)
-3. AMI Block Public Sharing (Account level)
+3. AMI Block Public Sharing ([Region](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-intro.html#block-public-access-to-amis) level) - [news from 2023-10-20](https://aws.amazon.com/about-aws/whats-new/2023/10/ami-block-public-enabled-aws-accounts-no-public-amis/)
 
 ## 💾 Suspicious Activities
 
@@ -66,3 +66,7 @@ ASSK comes with a CloudWatch Dashboard, please don't hesitate to adjust to your 
 - :pirate_flag: AWS Security Boutique: [zoph.io](https://zoph.io)
 - 💌 [AWS Security Digest Newsletter](https://awssecuritydigest.com)
 - :bird: Twitter: [zoph](https://twitter.com/zoph)
+
+## 🌧️ Other CSP Initiatives
+
+- [Microsoft Azure](https://github.com/O3-Cyber/azure-security-survival-kit)
