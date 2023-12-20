@@ -64,9 +64,9 @@ ASSK comes with a CloudWatch Dashboard, please don't hesitate to adjust to your 
 
 ## :man_technologist: Credits
 
-- :pirate_flag: AWS Security Boutique: [zoph.io](https://zoph.io)
+- 🏴‍☠️ AWS Security Boutique: [zoph.io](https://zoph.io)
 - 💌 [AWS Security Digest Newsletter](https://awssecuritydigest.com)
-- :bird: X/Twitter: [zoph](https://twitter.com/zoph)
+- 🐦 X/Twitter: [zoph](https://twitter.com/zoph)
 
 ## 🌧️ Other CSP Initiatives
 
