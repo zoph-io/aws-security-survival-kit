@@ -34,6 +34,7 @@ The following suspicious activities are currently supported:
 9. AMI Exfiltration (`ModifyImageAttribute`)
 10. Who Am I Calls (`GetCallerIdentity`)
 11. IMDSv1 RunInstances (`RunInstances` && `optional` http tokens)
+12. CloudShell Exfiltration (`GetFileDownloadUrls`)
 
 ## :keyboard: Usage
 

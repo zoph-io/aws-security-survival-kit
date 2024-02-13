@@ -179,6 +179,36 @@ Resources:
           MetricNamespace: "CloudTrailMetrics"
           MetricName: "IMDSv1RunInstance"
 
+  CloudWatchLogsMetricsFilterCloudShellGetFileDownloadUrls:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref CTLogGroupName
+      FilterPattern: '{ ($.eventName = GetFileDownloadUrls) }'
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "CloudTrailMetrics"
+          MetricName: "CloudShellGetFileDownloadUrls"
+          DefaultValue: 0
+
+  AlarmCloudShellGetFiledownloadUrls:
+    # Can detect data exfil through CloudShell (ie: scrape and download credentials stored in Secrets Manager)
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      ActionsEnabled: true
+      AlarmName: !Sub "CloudShell GetFileDownloadUrls"
+      AlarmActions:
+        - !Ref CtAlertingTopic
+      AlarmDescription: >
+        Alarm on CloudShell GetFileDownloadUrls
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      MetricName: "CloudShellGetFileDownloadUrls"
+      Namespace: "CloudTrailMetrics"
+      Period: "300"
+      Statistic: Sum
+      Threshold: 1
+      TreatMissingData: "notBreaching"
+
   CtAlertingTopic:
     # https://aws.amazon.com/premiumsupport/knowledge-center/cloudwatch-receive-sns-for-alarm-trigger/
     Type: "AWS::SNS::Topic"
