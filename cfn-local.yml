@@ -98,6 +98,28 @@ Resources:
           eventName:
             - "GetCallerIdentity"
 
+  EventRuleCloudShellGetFileDownloadUrls:
+    # Can detect data exfil through CloudShell (ie: scrape and download credentials stored in Secrets Manager)
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-cloudshell-getfiledownloadurls"
+      Description: !Sub "[${Project}] Detect CloudShell GetFileDownloadUrls"
+      State: "ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+      EventPattern:
+        source:
+          - aws.cloudshell
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "cloudshell.amazonaws.com"
+          eventName:
+            - "GetFileDownloadUrls"
+
   CloudWatchLogsMetricsFilterAccessDenied:
     Type: AWS::Logs::MetricFilter
     Properties:
