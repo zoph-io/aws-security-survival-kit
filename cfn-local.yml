@@ -42,6 +42,26 @@ Resources:
         - Arn:
             Ref: CtAlertingTopic
           Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+            # Doc: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-events-rule-inputtransformer.html
+            InputTemplate: |
+              {
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>
+              }
       EventPattern:
         detail-type:
           - "AWS API Call via CloudTrail"
@@ -63,6 +83,25 @@ Resources:
         - Arn:
             Ref: CtAlertingTopic
           Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+            InputTemplate: |
+              {
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>
+              }
       EventPattern:
         source:
           - aws.ec2
@@ -87,6 +126,25 @@ Resources:
         - Arn:
             Ref: CtAlertingTopic
           Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+            InputTemplate: |
+              {
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>
+              }
       EventPattern:
         source:
           - aws.sts
@@ -109,6 +167,27 @@ Resources:
         - Arn:
             Ref: CtAlertingTopic
           Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              FilePath: "$.detail.requestParameters.FileDownloadPath"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+            InputTemplate: |
+              {
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "📂 FilePath": <FilePath>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>
+              }
       EventPattern:
         source:
           - aws.cloudshell
