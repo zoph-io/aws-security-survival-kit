@@ -50,6 +50,12 @@ Setup the correct parameters in the `Makefile`, then run the following command:
 
     $ make deploy
 
+### 📫 Notifications
+
+> You will receive alerts by emails sent by SNS Topic
+
+![Email Notification](./assets/notification.png)
+
 ### :robot: ChatOps
 
 Setup [AWS Chatbot](https://aws.amazon.com/chatbot/) for best experience to get notified directly on Slack.
