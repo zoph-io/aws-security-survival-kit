@@ -35,8 +35,8 @@ Resources:
   EventRuleCTChange:
     Type: "AWS::Events::Rule"
     Properties:
-      Name: "detect-cloudtrail-changes"
-      Description: "Monitor change on CloudTrail setup"
+      Name: !Sub "${Project}-detect-cloudtrail-changes"
+      Description: !Sub "[${Project}] Monitor change on CloudTrail setup"
       State: "ENABLED"
       Targets:
         - Arn:
@@ -76,8 +76,8 @@ Resources:
   EventRuleExfilDisk:
     Type: "AWS::Events::Rule"
     Properties:
-      Name: "detect-disk-exfiltration"
-      Description: "Detect exfiltration on EBS Snapshot or AMI (sharing)"
+      Name: !Sub "${Project}-detect-disk-exfiltration"
+      Description: !Sub "[${Project}] Detect exfiltration on EBS Snapshot or AMI (sharing)"
       State: "ENABLED"
       Targets:
         - Arn:
@@ -119,8 +119,8 @@ Resources:
   EventRuleStsWhoAmI:
     Type: "AWS::Events::Rule"
     Properties:
-      Name: "detect-sts-whoami"
-      Description: "Detect STS get-caller-identity"
+      Name: !Sub "${Project}-detect-sts-whoami"
+      Description: !Sub "[${Project}] Detect STS get-caller-identity"
       State: "ENABLED"
       Targets:
         - Arn:
@@ -214,7 +214,7 @@ Resources:
     Type: "AWS::CloudWatch::Alarm"
     Properties:
       ActionsEnabled: true
-      AlarmName: !Sub "Unauthorized API Call"
+      AlarmName: !Sub "Unauthorized API Call [${Project}]"
       AlarmActions:
         - !Ref CtAlertingTopic
       AlarmDescription: >
@@ -231,8 +231,8 @@ Resources:
   AlarmConsoleFailedAuth:
     Type: "AWS::CloudWatch::Alarm"
     Properties:
-      AlarmName: "Failed Console Login"
-      AlarmDescription: "Failed Console Login"
+      AlarmName: !Sub "Failed Console Login [${Project}]"
+      AlarmDescription: !Sub "Failed Console Login [${Project}]"
       MetricName: "ConsoleLoginFailures"
       Namespace: "CloudTrailMetrics"
       Statistic: "Sum"
@@ -257,8 +257,8 @@ Resources:
   AlarmIMDSv1RunInstance:
     Type: "AWS::CloudWatch::Alarm"
     Properties:
-      AlarmName: "IMDSv1 RunInstance Detected"
-      AlarmDescription: "IMDSv1 RunInstance Detected"
+      AlarmName: !Sub "IMDSv1 RunInstance Detected [${Project}]"
+      AlarmDescription: !Sub "IMDSv1 RunInstance Detected [${Project}]"
       MetricName: "IMDSv1RunInstance"
       Namespace: "CloudTrailMetrics"
       Statistic: "Sum"
