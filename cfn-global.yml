@@ -60,7 +60,7 @@ Resources:
   EventRuleCTChange:
     Type: "AWS::Events::Rule"
     Properties:
-      Name: "detect-cloudtrail-changes-global"
+      Name: !Sub "${Project}-detect-cloudtrail-changes-global"
       Description: !Sub "[${Project}] Monitor change on CloudTrail setup"
       State: "ENABLED"
       Targets:
@@ -101,7 +101,7 @@ Resources:
   EventRuleHealth:
     Type: "AWS::Events::Rule"
     Properties:
-      Name: "detect-aws-health-events"
+      Name: !Sub "${Project}-detect-aws-health-events"
       Description: !Sub "[${Project}] Monitor AWS Health Dashboard events"
       State: "ENABLED"
       Targets:
@@ -137,7 +137,7 @@ Resources:
   EventRuleIAMUsers:
     Type: "AWS::Events::Rule"
     Properties:
-      Name: "detect-iam-user-changes"
+      Name: !Sub "${Project}-detect-iam-user-changes"
       Description: !Sub "[${Project}] Monitor IAM Users changes"
       State: "ENABLED"
       Targets:
@@ -190,7 +190,7 @@ Resources:
   EventRuleMFAChanges:
     Type: "AWS::Events::Rule"
     Properties:
-      Name: "detect-iam-mfa-changes"
+      Name: !Sub "${Project}-detect-iam-mfa-changes"
       Description: !Sub "[${Project}] Monitor MFA Changes"
       State: "ENABLED"
       Targets:
