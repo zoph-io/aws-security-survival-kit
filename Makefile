@@ -47,6 +47,14 @@ account_level_security:
 		--region ${LocalAWSRegion}
 	@if [ $$? -eq 0 ]; then echo "✅ Snapshot Block Public Access Enabled"; fi
 
+# Enable Instance Metadata Service Version 2 Default
+	@echo "==> Enable IMDSv2 by Default (Region Level)"
+	@aws ec2 modify-instance-metadata-defaults \
+		--region ${LocalAWSRegion} \
+		--http-tokens required \
+		--http-put-response-hop-limit 2
+	@if [ $$? -eq 0 ]; then echo "✅ IMDSv2 is now set by default"; fi
+
 deploy: account_level_security
 	aws cloudformation deploy \
 		--template-file ./cfn-local.yml \

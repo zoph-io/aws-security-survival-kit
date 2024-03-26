@@ -16,6 +16,7 @@ This kit will also enable the following default security configuration to your A
 2. S3 Block Public Access (Account level)
 3. Block AMI Public Sharing ([Region](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-intro.html#block-public-access-to-amis) level) - [from 2023-10-20](https://aws.amazon.com/about-aws/whats-new/2023/10/ami-block-public-enabled-aws-accounts-no-public-amis/)
 4. Block Snapshot Public Sharing ([Region](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-intro.html#block-public-access-to-amis) level) - [from 2023-11-09](https://aws.amazon.com/blogs/aws/new-block-public-sharing-of-amazon-ebs-snapshots/)
+5. Enable IMDSv2 by Default for new Instances (Region Level) - [from 2024-03-25](https://aws.amazon.com/about-aws/whats-new/2024/03/set-imdsv2-default-new-instance-launches/)
 
 ## 💾 Suspicious Activities
 
