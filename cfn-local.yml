@@ -44,6 +44,7 @@ Resources:
           Id: CtAlertingTopic
           InputTransformer:
             InputPathsMap:
+              EventId: "$.id"
               EventTime: "$.detail.eventTime"
               EventName: "$.detail.eventName"
               EventAccountId: "$.account"
@@ -54,6 +55,7 @@ Resources:
             # Doc: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-events-rule-inputtransformer.html
             InputTemplate: |
               {
+                "🆔 EventId": <EventId>,
                 "🕑 EventTime": <EventTime>,
                 "👉 EventName": <EventName>,
                 "🧾 EventAccountId": <EventAccountId>,
@@ -85,6 +87,7 @@ Resources:
           Id: CtAlertingTopic
           InputTransformer:
             InputPathsMap:
+              EventId: "$.id"
               EventTime: "$.detail.eventTime"
               EventName: "$.detail.eventName"
               EventAccountId: "$.account"
@@ -94,6 +97,7 @@ Resources:
               EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
             InputTemplate: |
               {
+                "🆔 EventId": <EventId>,
                 "🕑 EventTime": <EventTime>,
                 "👉 EventName": <EventName>,
                 "🧾 EventAccountId": <EventAccountId>,
@@ -128,6 +132,7 @@ Resources:
           Id: CtAlertingTopic
           InputTransformer:
             InputPathsMap:
+              EventId: "$.id"
               EventTime: "$.detail.eventTime"
               EventName: "$.detail.eventName"
               EventAccountId: "$.account"
@@ -137,6 +142,7 @@ Resources:
               EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
             InputTemplate: |
               {
+                "🆔 EventId": <EventId>,
                 "🕑 EventTime": <EventTime>,
                 "👉 EventName": <EventName>,
                 "🧾 EventAccountId": <EventAccountId>,
@@ -169,6 +175,7 @@ Resources:
           Id: CtAlertingTopic
           InputTransformer:
             InputPathsMap:
+              EventId: "$.id"
               EventTime: "$.detail.eventTime"
               EventName: "$.detail.eventName"
               EventAccountId: "$.account"
@@ -179,6 +186,7 @@ Resources:
               EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
             InputTemplate: |
               {
+                "🆔 EventId": <EventId>,
                 "🕑 EventTime": <EventTime>,
                 "👉 EventName": <EventName>,
                 "🧾 EventAccountId": <EventAccountId>,
