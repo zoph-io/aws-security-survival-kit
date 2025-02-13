@@ -240,6 +240,59 @@ Resources:
             - "EnableMFADevice"
             - "ResyncMFADevice"
 
+  EventRuleAdminPolicyAttachment:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-admin-policy-attachment"
+      Description: !Sub "[${Project}] Monitor AdministratorAccess policy attachments to roles, users, and groups"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              PolicyArn: "$.detail.requestParameters.policyArn"
+              RoleName: "$.detail.requestParameters.roleName"
+              UserName: "$.detail.requestParameters.userName"
+              GroupName: "$.detail.requestParameters.groupName"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "📜 PolicyArn": <PolicyArn>,
+                "👤 Principal (Role)": <RoleName>,
+                "👤 Principal (User)": <UserName>,
+                "👤 Principal (Group)": <GroupName>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "iam.amazonaws.com"
+          eventName:
+            - "AttachRolePolicy"
+            - "AttachUserPolicy"
+            - "AttachGroupPolicy"
+          requestParameters:
+            policyArn:
+              - "arn:aws:iam::aws:policy/AdministratorAccess"
+
   CtAlertingTopic:
     # https://aws.amazon.com/premiumsupport/knowledge-center/cloudwatch-receive-sns-for-alarm-trigger/
     Type: "AWS::SNS::Topic"

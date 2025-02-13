@@ -30,7 +30,108 @@ Resources:
     Properties:
       DashboardName: !Sub "AWS-Security-Survival-Kit-Dashboard-${AWS::Region}"
       DashboardBody: !Sub |
-        {"widgets": [{ "height": 12, "width": 24, "y": 0, "x": 0, "type": "log", "properties": { "query": "SOURCE '${CTLogGroupName}' | fields eventTime, eventName, eventSource, recipientAccountId as Account, userIdentity.sessionContext.sessionIssuer.userName as Principal, userIdentity.invokedBy as InvokedBy, errorCode\n\n\n\n | filter errorCode like /(Client.UnauthorizedOperation|AccessDenied)/", "region": "${Region}", "title": "Latest AccessDenied from CT", "view": "table" } }, { "height": 6, "width": 24, "y": 12, "x": 0, "type": "log", "properties": { "query": "SOURCE '${CTLogGroupName}' | fields eventTime, eventName, eventSource, userIdentity.sessionContext.sessionIssuer.userName as Principal, userIdentity.invokedBy as InvokedBy, responseElements.instancesSet.items.0.metadataOptions.httpTokens as IMDSv2\n\n | filter eventName like \"RunInstances\" and IMDSv2 like \"optional\"", "region": "${Region}", "title": "IMDSv1 RunInstances", "view": "table" } } ] }
+        {
+          "widgets": [
+            {
+              "height": 6,
+              "width": 12,
+              "y": 0,
+              "x": 0,
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  [ "CloudTrailMetrics", "UnauthorizedAttemptCount", { "stat": "Sum", "period": 300 } ]
+                ],
+                "region": "${Region}",
+                "title": "Access Denied Events (5min)",
+                "view": "timeSeries",
+                "stacked": false
+              }
+            },
+            {
+              "height": 6,
+              "width": 12,
+              "y": 0,
+              "x": 12,
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  [ "CloudTrailMetrics", "ConsoleLoginFailures", { "stat": "Sum", "period": 300 } ],
+                  [ "CloudTrailMetrics", "IMDSv1RunInstance", { "stat": "Sum", "period": 300 } ]
+                ],
+                "region": "${Region}",
+                "title": "Security Events Overview",
+                "view": "timeSeries",
+                "stacked": false
+              }
+            },
+            {
+              "height": 6,
+              "width": 24,
+              "y": 6,
+              "x": 0,
+              "type": "log",
+              "properties": {
+                "query": "SOURCE '${CTLogGroupName}' | fields eventTime, eventName, eventSource, recipientAccountId as Account, userIdentity.sessionContext.sessionIssuer.userName as Principal, userIdentity.invokedBy as InvokedBy, errorCode, errorMessage\n | filter errorCode like /(Client.UnauthorizedOperation|AccessDenied)/\n | sort eventTime desc\n | limit 10",
+                "region": "${Region}",
+                "title": "Latest Access Denied Events",
+                "view": "table"
+              }
+            },
+            {
+              "height": 6,
+              "width": 12,
+              "y": 12,
+              "x": 0,
+              "type": "log",
+              "properties": {
+                "query": "SOURCE '${CTLogGroupName}' | fields eventTime, eventName, eventSource, userIdentity.sessionContext.sessionIssuer.userName as Principal, userIdentity.invokedBy as InvokedBy, responseElements.instancesSet.items.0.metadataOptions.httpTokens as IMDSv2\n | filter eventName like \"RunInstances\" and IMDSv2 like \"optional\"\n | sort eventTime desc\n | limit 5",
+                "region": "${Region}",
+                "title": "Recent IMDSv1 Instance Launches",
+                "view": "table"
+              }
+            },
+            {
+              "height": 6,
+              "width": 12,
+              "y": 12,
+              "x": 12,
+              "type": "log",
+              "properties": {
+                "query": "SOURCE '${CTLogGroupName}' | fields eventTime, eventName, eventSource, userIdentity.sessionContext.sessionIssuer.userName as Principal\n | filter eventSource = \"cloudtrail.amazonaws.com\" and eventName in ['StopLogging', 'DeleteTrail', 'UpdateTrail']\n | sort eventTime desc\n | limit 5",
+                "region": "${Region}",
+                "title": "CloudTrail Changes",
+                "view": "table"
+              }
+            },
+            {
+              "height": 6,
+              "width": 12,
+              "y": 18,
+              "x": 0,
+              "type": "log",
+              "properties": {
+                "query": "SOURCE '${CTLogGroupName}' | fields eventTime, eventName, eventSource, userIdentity.sessionContext.sessionIssuer.userName as Principal\n | filter eventSource = \"kms.amazonaws.com\" and eventName in ['DisableKey', 'ScheduleKeyDeletion', 'DeleteAlias', 'DisableKeyRotation']\n | sort eventTime desc\n | limit 5",
+                "region": "${Region}",
+                "title": "KMS Key Changes",
+                "view": "table"
+              }
+            },
+            {
+              "height": 6,
+              "width": 12,
+              "y": 18,
+              "x": 12,
+              "type": "log",
+              "properties": {
+                "query": "SOURCE '${CTLogGroupName}' | fields eventTime, eventName, eventSource, userIdentity.sessionContext.sessionIssuer.userName as Principal\n | filter eventSource = \"ec2.amazonaws.com\" and eventName in ['DeleteFlowLogs', 'ModifyFlowLogs']\n | sort eventTime desc\n | limit 5",
+                "region": "${Region}",
+                "title": "VPC Flow Logs Changes",
+                "view": "table"
+              }
+            }
+          ]
+        }
 
   EventRuleCTChange:
     Type: "AWS::Events::Rule"
@@ -287,6 +388,140 @@ Resources:
         - MetricValue: "1"
           MetricNamespace: "CloudTrailMetrics"
           MetricName: "IMDSv1RunInstance"
+
+  EventRuleKMSKeyChanges:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-kms-key-changes"
+      Description: !Sub "[${Project}] Monitor KMS key deletions and disabling"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              KeyId: "$.detail.requestParameters.keyId"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🔑 KeyId": <KeyId>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "kms.amazonaws.com"
+          eventName:
+            - "DisableKey"
+            - "ScheduleKeyDeletion"
+            - "DeleteAlias"
+            - "DisableKeyRotation"
+
+  EventRuleVPCFlowLogs:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-flow-logs-changes"
+      Description: !Sub "[${Project}] Monitor VPC Flow Logs deletion or modification"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              FlowLogId: "$.detail.requestParameters.flowLogId"
+              ResourceId: "$.detail.requestParameters.resourceId"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "📝 FlowLogId": <FlowLogId>,
+                "🔖 ResourceId": <ResourceId>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "ec2.amazonaws.com"
+          eventName:
+            - "DeleteFlowLogs"
+            - "ModifyFlowLogs"
+
+  EventRuleConfigChanges:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-config-changes"
+      Description: !Sub "[${Project}] Monitor AWS Config modifications"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "config.amazonaws.com"
+          eventName:
+            - "StopConfigurationRecorder"
+            - "DeleteConfigurationRecorder"
+            - "DeleteConfigRule"
+            - "DeleteEvaluationResults"
+
+  EventRuleSecurityGroupChanges:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-sg-changes"
+      Description: !Sub "[${Project}] Monitor security group modifications"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "ec2.amazonaws.com"
+          eventName:
+            - "AuthorizeSecurityGroupIngress"
+            - "RevokeSecurityGroupIngress"
+            - "AuthorizeSecurityGroupEgress"
+            - "RevokeSecurityGroupEgress"
 
   CtAlertingTopic:
     # https://aws.amazon.com/premiumsupport/knowledge-center/cloudwatch-receive-sns-for-alarm-trigger/
