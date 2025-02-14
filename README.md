@@ -20,7 +20,7 @@ This kit enables several important security configurations in your aws account b
 
 ## 💾 Suspicious Activities
 
-Using this kit, you will deploy EventBridge (CloudWatch Event) Rules and CloudWatch Metric Filters and Alarms on select suspicious activities. It comes with a CloudWatch Dashboard to give you more insights about what is ringing 🔔
+Using this kit, you will deploy EventBridge (CloudWatch Event) Rules and CloudWatch Metric Filters and Alarms on following suspicious activities. It comes with CloudWatch Dashboards to give you more insights about what is ringing 🔔
 
 The following suspicious activities are currently supported:
 
@@ -49,7 +49,7 @@ The following suspicious activities are currently supported:
 - `Project`: Name of the Project (e.g.: aws-security-survival-kit)
 - `Description`: Description of the Project (e.g.: Bare minimum ...)
 - `LocalAWSRegion`: Region where your workloads and CloudTrail are located (e.g.: `eu-west-1`)
-- `CTLogGroupName`: Cloudtrail CloudWatch LogGroup name
+- `CTLogGroupName`: Cloudtrail CloudWatch LogGroup name (**Required**)
 
 Setup the correct parameters in the `Makefile`, then run the following command:
 
@@ -65,9 +65,9 @@ Setup the correct parameters in the `Makefile`, then run the following command:
 
 Setup [AWS Chatbot](https://aws.amazon.com/chatbot/) for best experience to get notified directly on Slack.
 
-### 📈 Dashboard
+### 📈 Dashboards
 
-ASSK comes with a CloudWatch Dashboard, please don't hesitate to adjust to your needs.
+ASSK comes with two CloudWatch Dashboards (Local and Global) to bring better visibility on suspicious activities on your AWS Account.
 
 ## :man_technologist: Credits
 
@@ -75,6 +75,6 @@ ASSK comes with a CloudWatch Dashboard, please don't hesitate to adjust to your 
 - 🦋 BlueSky: [@zoph](https://bsky.app/zoph.me)
 - 🐦 X: [@zoph](https://x.com/zoph)
 
-## 🌧️ Other CSP Initiatives
+## 🌧️ Other Initiatives
 
 - [Microsoft Azure](https://github.com/O3-Cyber/azure-security-survival-kit) from folks @[O3 Cyber](https://www.o3c.no/)
