@@ -14,9 +14,9 @@ This kit enables several important security configurations in your aws account b
 
 1. Automatic encryption for all ebs volumes (per region)
 2. Account-wide s3 block public access
-3. Prevention of public ami sharing (per region) - [enabled from 2023-10-20](https://aws.amazon.com/about-aws/whats-new/2023/10/ami-block-public-enabled-aws-accounts-no-public-amis/)
-4. Prevention of public snapshot sharing (per region) - [enabled from 2023-11-09](https://aws.amazon.com/blogs/aws/new-block-public-sharing-of-amazon-ebs-snapshots/)
-5. IMDSv2 requirement for new instances (per region) - [enabled from 2024-03-25](https://aws.amazon.com/about-aws/whats-new/2024/03/set-imdsv2-default-new-instance-launches/)
+3. Prevention of public ami sharing (per region) - [Annoncement](https://aws.amazon.com/about-aws/whats-new/2023/10/ami-block-public-enabled-aws-accounts-no-public-amis/)
+4. Prevention of public snapshot sharing (per region) - [Blogpost](https://aws.amazon.com/blogs/aws/new-block-public-sharing-of-amazon-ebs-snapshots/)
+5. IMDSv2 requirement for new instances (per region) - [Annoncement](https://aws.amazon.com/about-aws/whats-new/2024/03/set-imdsv2-default-new-instance-launches/)
 
 ## 💾 Suspicious Activities
 
