@@ -340,3 +340,67 @@ Resources:
               Ref: CtAlertingTopic
       Topics:
         - Ref: CtAlertingTopic
+
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub "AWS-Security-Survival-Kit-Dashboard-Global"
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "height": 6,
+              "width": 24,
+              "y": 0,
+              "x": 0,
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  [ { "expression": "SEARCH('{AWS/Events,RuleName} MetricName=\"Invocations\"', 'Sum', 300)", "label": "EventBridge Rules Invocations", "id": "e1" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "title": "Security Events Overview",
+                "period": 300,
+                "stat": "Sum"
+              }
+            },
+            {
+              "height": 6,
+              "width": 12,
+              "y": 6,
+              "x": 0,
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  [ "AWS/Events", "Invocations", "RuleName", "${AWS::StackName}-RootActivityRule", { "stat": "Sum", "period": 300 } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "title": "Root Account Activity",
+                "period": 300
+              }
+            },
+            {
+              "height": 6,
+              "width": 12,
+              "y": 6,
+              "x": 12,
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  [ "AWS/Events", "Invocations", "RuleName", "${Project}-detect-iam-user-changes", { "stat": "Sum", "period": 300 } ],
+                  [ "AWS/Events", "Invocations", "RuleName", "${Project}-detect-iam-mfa-changes", { "stat": "Sum", "period": 300 } ],
+                  [ "AWS/Events", "Invocations", "RuleName", "${Project}-detect-admin-policy-attachment", { "stat": "Sum", "period": 300 } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-east-1",
+                "title": "IAM Changes",
+                "period": 300
+              }
+            }
+          ]
+        }
