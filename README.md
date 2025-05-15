@@ -43,6 +43,8 @@ The following suspicious activities are currently supported:
 17. EC2 Password Data Retrieval (`GetPasswordData`)
 18. Secrets Manager Batch Retrieval (`BatchGetSecretValue`)
 19. Route53 DNS Logging Changes (`DeleteResolverQueryLogConfig`)
+20. VPC Flow Logs Changes (`DeleteFlowLogs`, `ModifyFlowLogs`)
+21. Security Group Admin Ports Exposure (`AuthorizeSecurityGroupIngress` with ports 22/3389 from 0.0.0.0/0)
 
 ## :keyboard: Usage
 

@@ -649,6 +649,63 @@ Resources:
           eventName:
             - "DeleteResolverQueryLogConfig"
 
+  EventRuleSecurityGroupOpenAdminPorts:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-sg-open-admin-ports"
+      Description: !Sub "[${Project}] Monitor security group changes that open administrative ports to the internet"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              GroupId: "$.detail.requestParameters.groupId"
+              CidrIp: "$.detail.requestParameters.cidrIp"
+              FromPort: "$.detail.requestParameters.fromPort"
+              ToPort: "$.detail.requestParameters.toPort"
+              IpProtocol: "$.detail.requestParameters.ipProtocol"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🛡️ GroupId": <GroupId>,
+                "🔢 CidrIp": <CidrIp>,
+                "🔌 FromPort": <FromPort>,
+                "🔌 ToPort": <ToPort>,
+                "🔄 Protocol": <IpProtocol>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "ec2.amazonaws.com"
+          eventName:
+            - "AuthorizeSecurityGroupIngress"
+          requestParameters:
+            cidrIp:
+              - "0.0.0.0/0"
+              - "*.*.*.*/*"
+            fromPort:
+              - 22
+              - 3389
+
   CtAlertingTopic:
     # https://aws.amazon.com/premiumsupport/knowledge-center/cloudwatch-receive-sns-for-alarm-trigger/
     Type: "AWS::SNS::Topic"
