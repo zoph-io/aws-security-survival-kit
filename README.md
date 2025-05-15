@@ -40,6 +40,8 @@ The following suspicious activities are currently supported:
 14. KMS Key Changes (`DisableKey`, `ScheduleKeyDeletion`, `DeleteAlias`, `DisableKeyRotation`)
 15. Security Group Changes (`AuthorizeSecurityGroupIngress`, `RevokeSecurityGroupIngress`, `AuthorizeSecurityGroupEgress`, `RevokeSecurityGroupEgress`)
 16. AWS Config Changes (`StopConfigurationRecorder`, `DeleteConfigurationRecorder`, `DeleteConfigRule`, `DeleteEvaluationResults`)
+17. EC2 Password Data Retrieval (`GetPasswordData`)
+18. Secrets Manager Batch Retrieval (`BatchGetSecretValue`)
 
 ## :keyboard: Usage
 

@@ -523,6 +523,90 @@ Resources:
             - "AuthorizeSecurityGroupEgress"
             - "RevokeSecurityGroupEgress"
 
+  EventRuleEC2PasswordData:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-ec2-password-data"
+      Description: !Sub "[${Project}] Monitor EC2 GetPasswordData calls"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              InstanceId: "$.detail.requestParameters.instanceId"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "💻 InstanceId": <InstanceId>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "ec2.amazonaws.com"
+          eventName:
+            - "GetPasswordData"
+
+  EventRuleSecretsManagerBatchGet:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-secretsmanager-batch-get"
+      Description: !Sub "[${Project}] Monitor SecretsManager BatchGetSecretValue calls"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              SecretIds: "$.detail.requestParameters.secretIdList"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🔑 SecretIds": <SecretIds>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "secretsmanager.amazonaws.com"
+          eventName:
+            - "BatchGetSecretValue"
+
   CtAlertingTopic:
     # https://aws.amazon.com/premiumsupport/knowledge-center/cloudwatch-receive-sns-for-alarm-trigger/
     Type: "AWS::SNS::Topic"
