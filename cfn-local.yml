@@ -706,6 +706,52 @@ Resources:
               - 22
               - 3389
 
+  EventRuleRolesAnywhereTrustChanges:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-rolesanywhere-changes"
+      Description: !Sub "[${Project}] Monitor IAM Roles Anywhere trust anchor and profile creation"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              ProfileName: "$.detail.requestParameters.name"
+              TrustAnchorName: "$.detail.requestParameters.name"
+              TrustAnchorSource: "$.detail.requestParameters.source.sourceData.x509CertificateData"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "📋 Name": <ProfileName><TrustAnchorName>,
+                "🔐 TrustAnchorSource": <TrustAnchorSource>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "rolesanywhere.amazonaws.com"
+          eventName:
+            - "CreateProfile"
+            - "CreateTrustAnchor"
+
   CtAlertingTopic:
     # https://aws.amazon.com/premiumsupport/knowledge-center/cloudwatch-receive-sns-for-alarm-trigger/
     Type: "AWS::SNS::Topic"

@@ -45,6 +45,7 @@ The following suspicious activities are currently supported:
 19. Route53 DNS Logging Changes (`DeleteResolverQueryLogConfig`)
 20. VPC Flow Logs Changes (`DeleteFlowLogs`, `ModifyFlowLogs`)
 21. Security Group Admin Ports Exposure (`AuthorizeSecurityGroupIngress` with ports 22/3389 from 0.0.0.0/0)
+22. IAM Roles Anywhere Changes (`CreateProfile`, `CreateTrustAnchor`)
 
 ## :keyboard: Usage
 
