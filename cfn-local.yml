@@ -731,16 +731,17 @@ Resources:
               TrustAnchorSource: "$.detail.requestParameters.source.sourceData.x509CertificateData"
             InputTemplate: |
               {
-                "🆔 EventId": <EventId>,
-                "🕑 EventTime": <EventTime>,
-                "👉 EventName": <EventName>,
-                "🧾 EventAccountId": <EventAccountId>,
-                "🌐 EventSourceIp": <EventSourceIp>,
-                "🌏 EventRegion": <EventRegion>,
-                "👨‍🏭 EventBlame": <EventBlame>,
-                "📃 EventBlameDetails": <EventBlameDetails>,
-                "📋 Name": <ProfileName><TrustAnchorName>,
-                "🔐 TrustAnchorSource": <TrustAnchorSource>
+                "EventId": <EventId>,
+                "EventTime": <EventTime>,
+                "EventName": <EventName>,
+                "EventAccountId": <EventAccountId>,
+                "EventSourceIp": <EventSourceIp>,
+                "EventRegion": <EventRegion>,
+                "EventBlame": <EventBlame>,
+                "EventBlameDetails": <EventBlameDetails>,
+                "ProfileName": <ProfileName>,
+                "TrustAnchorName": <TrustAnchorName>,
+                "TrustAnchorSource": <TrustAnchorSource>
               }
       EventPattern:
         detail-type:
