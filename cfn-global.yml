@@ -194,6 +194,7 @@ Resources:
             - "DetachGroupPolicy"
             - "DetachUserPolicy"
             - "PutUserPolicy"
+            - "UpdateLoginProfile"
 
   EventRuleMFAChanges:
     Type: "AWS::Events::Rule"

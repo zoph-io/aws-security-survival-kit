@@ -27,7 +27,7 @@ The following suspicious activities are currently supported:
 1. Root User activities
 2. CloudTrail changes (`StopLogging`, `DeleteTrail`, `UpdateTrail`)
 3. AWS Personal Health Dashboard Events
-4. IAM Users Changes (`Create`, `Delete`, `Update`, `CreateAccessKey`, etc..)
+4. IAM Users Changes (`Create`, `Delete`, `Update`, `CreateAccessKey`, `UpdateLoginProfile`, etc..)
 5. IAM Suspicious Activities (`Attach*Policy`) with `AdministratorAccess` Managed IAM Policy
 6. MFA Monitoring (`CreateVirtualMFADevice` `DeactivateMFADevice` `DeleteVirtualMFADevice`, etc..)
 7. Unauthorized Operations (`Access Denied`, `UnauthorizedOperation`)
@@ -46,6 +46,7 @@ The following suspicious activities are currently supported:
 20. VPC Flow Logs Changes (`DeleteFlowLogs`, `ModifyFlowLogs`)
 21. Security Group Admin Ports Exposure (`AuthorizeSecurityGroupIngress` with ports 22/3389 from 0.0.0.0/0)
 22. IAM Roles Anywhere Changes (`CreateProfile`, `CreateTrustAnchor`)
+23. STS Federation Token Creation (`GetFederationToken`)
 
 ## :keyboard: Usage
 
