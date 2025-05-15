@@ -42,6 +42,7 @@ The following suspicious activities are currently supported:
 16. AWS Config Changes (`StopConfigurationRecorder`, `DeleteConfigurationRecorder`, `DeleteConfigRule`, `DeleteEvaluationResults`)
 17. EC2 Password Data Retrieval (`GetPasswordData`)
 18. Secrets Manager Batch Retrieval (`BatchGetSecretValue`)
+19. Route53 DNS Logging Changes (`DeleteResolverQueryLogConfig`)
 
 ## :keyboard: Usage
 
