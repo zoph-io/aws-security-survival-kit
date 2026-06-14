@@ -18,8 +18,70 @@ Parameters:
   Region:
     Type: String
     Description: AWS Region
+  AccessDeniedThreshold:
+    Type: Number
+    Default: 25
+    MinValue: 1
+    Description: Threshold (per evaluation period) for the Unauthorized API Call alarm. Raised from the original value of 1 to reduce alert fatigue from legitimate AccessDenied noise (SCPs, eventual consistency, etc.).
+  EnableS3PolicyDetection:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+    Description: Enable EventBridge rule for S3 bucket policy/ACL/PublicAccessBlock changes (PutBucketPolicy, DeleteBucketPolicy, PutBucketAcl, PutBucketPublicAccessBlock). Off by default - can be noisy in active environments.
+  EnableLambdaDetection:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+    Description: Enable EventBridge rule for Lambda function creation, code updates, and permission grants. Off by default - can be noisy in environments deploying Lambdas frequently.
+  EnableSSODetection:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+    Description: Enable EventBridge rule for IAM Identity Center (SSO) permission set / account assignment changes. Off by default - only enable in the account and region of the SSO/Identity Center tenant.
+  EnableNetworkInfrastructureDetection:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+    Description: Enable EventBridge rule for VPC peering, route table, and Internet Gateway changes. Off by default - extremely noisy in IaC-driven environments (Terraform/CDK route updates fire continuously).
+  EnableGetCallerIdentityDetection:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+    Description: Enable EventBridge rule for sts:GetCallerIdentity calls. On by default for backward compatibility; STRONGLY consider disabling - this API is called by every AWS SDK init, every Terraform plan, etc. and dominates alert volume.
+  EnableSecretsBatchGetDetection:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+    Description: Enable EventBridge rule for SecretsManager BatchGetSecretValue calls. On by default for backward compatibility; consider disabling if you have ECS/Lambda/EKS workloads that legitimately batch-load secrets at startup.
+  EnableEc2PasswordDataDetection:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+    Description: Enable EventBridge rule for ec2:GetPasswordData calls. On by default for backward compatibility; consider disabling in Windows fleets where SSM/admin tools call this routinely.
+  EnableSnsEncryption:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+    Description: Enable SNS topic encryption at rest using a dedicated customer-managed KMS key (CMK). When true, a CMK is created and used for the alerting topic. Cost consideration applies (KMS key + per-API-call charges).
+  TrustedAccountIds:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: Optional list of AWS account IDs that should be allowed to use the dedicated SNS KMS CMK (cross-account publish). Only relevant when EnableSnsEncryption=true. Leave empty to restrict to this account only.
 
 ###############################################################################
+
+###########################################################
+Conditions:
+  ###########################################################
+  S3PolicyDetectionEnabled: !Equals [!Ref EnableS3PolicyDetection, "true"]
+  LambdaDetectionEnabled: !Equals [!Ref EnableLambdaDetection, "true"]
+  SSODetectionEnabled: !Equals [!Ref EnableSSODetection, "true"]
+  NetworkInfrastructureDetectionEnabled: !Equals [!Ref EnableNetworkInfrastructureDetection, "true"]
+  GetCallerIdentityDetectionEnabled: !Equals [!Ref EnableGetCallerIdentityDetection, "true"]
+  SecretsBatchGetDetectionEnabled: !Equals [!Ref EnableSecretsBatchGetDetection, "true"]
+  Ec2PasswordDataDetectionEnabled: !Equals [!Ref EnableEc2PasswordDataDetection, "true"]
+  SnsEncryptionEnabled: !Equals [!Ref EnableSnsEncryption, "true"]
+  HasTrustedAccountIds: !Not [!Equals [!Join ["", !Ref TrustedAccountIds], ""]]
 
 ###########################################################
 Resources:
@@ -223,6 +285,7 @@ Resources:
 
   EventRuleStsWhoAmI:
     Type: "AWS::Events::Rule"
+    Condition: GetCallerIdentityDetectionEnabled
     Properties:
       Name: !Sub "${Project}-detect-sts-whoami"
       Description: !Sub "[${Project}] Detect STS get-caller-identity"
@@ -327,14 +390,14 @@ Resources:
       AlarmActions:
         - !Ref CtAlertingTopic
       AlarmDescription: >
-        Alarm on Unauthorized API Call
+        Alarm on Unauthorized API Call - threshold configurable via AccessDeniedThreshold parameter (default 25 to reduce noise from legitimate AccessDenied events such as SCP blocks and eventual consistency).
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 2
       MetricName: "UnauthorizedAttemptCount"
       Namespace: "CloudTrailMetrics"
       Period: 3600
       Statistic: Sum
-      Threshold: 1
+      Threshold: !Ref AccessDeniedThreshold
       TreatMissingData: "notBreaching"
 
   AlarmConsoleFailedAuth:
@@ -489,6 +552,27 @@ Resources:
         - Arn:
             Ref: CtAlertingTopic
           Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>
+              }
       EventPattern:
         detail-type:
           - "AWS API Call via CloudTrail"
@@ -511,6 +595,29 @@ Resources:
         - Arn:
             Ref: CtAlertingTopic
           Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              GroupId: "$.detail.requestParameters.groupId"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🛡️ GroupId": <GroupId>
+              }
       EventPattern:
         detail-type:
           - "AWS API Call via CloudTrail"
@@ -525,6 +632,7 @@ Resources:
 
   EventRuleEC2PasswordData:
     Type: "AWS::Events::Rule"
+    Condition: Ec2PasswordDataDetectionEnabled
     Properties:
       Name: !Sub "${Project}-detect-ec2-password-data"
       Description: !Sub "[${Project}] Monitor EC2 GetPasswordData calls"
@@ -567,6 +675,7 @@ Resources:
 
   EventRuleSecretsManagerBatchGet:
     Type: "AWS::Events::Rule"
+    Condition: SecretsBatchGetDetectionEnabled
     Properties:
       Name: !Sub "${Project}-detect-secretsmanager-batch-get"
       Description: !Sub "[${Project}] Monitor SecretsManager BatchGetSecretValue calls"
@@ -649,11 +758,11 @@ Resources:
           eventName:
             - "DeleteResolverQueryLogConfig"
 
-  EventRuleSecurityGroupOpenAdminPorts:
+  EventRuleSecurityGroupOpenAdminPortsIpv4:
     Type: "AWS::Events::Rule"
     Properties:
-      Name: !Sub "${Project}-detect-sg-open-admin-ports"
-      Description: !Sub "[${Project}] Monitor security group changes that open administrative ports to the internet"
+      Name: !Sub "${Project}-detect-sg-open-admin-ports-ipv4"
+      Description: !Sub "[${Project}] Monitor SG ingress opening admin ports (22/3389) to the internet via IPv4 (0.0.0.0/0)"
       State: "ENABLED"
       Targets:
         - Arn:
@@ -685,7 +794,7 @@ Resources:
                 "👨‍🏭 EventBlame": <EventBlame>,
                 "📃 EventBlameDetails": <EventBlameDetails>,
                 "🛡️ GroupId": <GroupId>,
-                "🔢 CidrIp": <CidrIp>,
+                "🔢 CidrIp (IPv4)": <CidrIp>,
                 "🔌 FromPort": <FromPort>,
                 "🔌 ToPort": <ToPort>,
                 "🔄 Protocol": <IpProtocol>
@@ -701,7 +810,62 @@ Resources:
           requestParameters:
             cidrIp:
               - "0.0.0.0/0"
-              - "*.*.*.*/*"
+            fromPort:
+              - 22
+              - 3389
+
+  EventRuleSecurityGroupOpenAdminPortsIpv6:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-sg-open-admin-ports-ipv6"
+      Description: !Sub "[${Project}] Monitor SG ingress opening admin ports (22/3389) to the internet via IPv6 (::/0)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              GroupId: "$.detail.requestParameters.groupId"
+              CidrIpv6: "$.detail.requestParameters.cidrIpv6"
+              FromPort: "$.detail.requestParameters.fromPort"
+              ToPort: "$.detail.requestParameters.toPort"
+              IpProtocol: "$.detail.requestParameters.ipProtocol"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🛡️ GroupId": <GroupId>,
+                "🔢 CidrIp (IPv6)": <CidrIpv6>,
+                "🔌 FromPort": <FromPort>,
+                "🔌 ToPort": <ToPort>,
+                "🔄 Protocol": <IpProtocol>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "ec2.amazonaws.com"
+          eventName:
+            - "AuthorizeSecurityGroupIngress"
+          requestParameters:
+            cidrIpv6:
+              - "::/0"
             fromPort:
               - 22
               - 3389
@@ -731,17 +895,17 @@ Resources:
               TrustAnchorSource: "$.detail.requestParameters.source.sourceData.x509CertificateData"
             InputTemplate: |
               {
-                "EventId": <EventId>,
-                "EventTime": <EventTime>,
-                "EventName": <EventName>,
-                "EventAccountId": <EventAccountId>,
-                "EventSourceIp": <EventSourceIp>,
-                "EventRegion": <EventRegion>,
-                "EventBlame": <EventBlame>,
-                "EventBlameDetails": <EventBlameDetails>,
-                "ProfileName": <ProfileName>,
-                "TrustAnchorName": <TrustAnchorName>,
-                "TrustAnchorSource": <TrustAnchorSource>
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🪪 ProfileName": <ProfileName>,
+                "⚓ TrustAnchorName": <TrustAnchorName>,
+                "📜 TrustAnchorSource": <TrustAnchorSource>
               }
       EventPattern:
         detail-type:
@@ -797,12 +961,431 @@ Resources:
           eventName:
             - "GetFederationToken"
 
+  EventRuleGuardDutyTampering:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-guardduty-tampering"
+      Description: !Sub "[${Project}] Monitor GuardDuty tampering (detector/destination deletion or update)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              DetectorId: "$.detail.requestParameters.detectorId"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🛡️ DetectorId": <DetectorId>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "guardduty.amazonaws.com"
+          eventName:
+            - "DeleteDetector"
+            - "UpdateDetector"
+            - "DeletePublishingDestination"
+            - "StopMonitoringMembers"
+
+  EventRuleGuardDutyFilterArchive:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-guardduty-filter-archive"
+      Description: !Sub "[${Project}] Monitor GuardDuty CreateFilter with ARCHIVE action (finding suppression)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              FilterName: "$.detail.requestParameters.name"
+              FilterAction: "$.detail.requestParameters.action"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🪪 FilterName": <FilterName>,
+                "🎬 FilterAction": <FilterAction>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "guardduty.amazonaws.com"
+          eventName:
+            - "CreateFilter"
+          requestParameters:
+            action:
+              - "ARCHIVE"
+
+  EventRuleNetworkInfrastructureChanges:
+    Type: "AWS::Events::Rule"
+    Condition: NetworkInfrastructureDetectionEnabled
+    Properties:
+      Name: !Sub "${Project}-detect-network-infra-changes"
+      Description: !Sub "[${Project}] Monitor network infrastructure changes (VPC peering, route tables, internet gateway)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              VpcId: "$.detail.requestParameters.vpcId"
+              RouteTableId: "$.detail.requestParameters.routeTableId"
+              InternetGatewayId: "$.detail.requestParameters.internetGatewayId"
+              DestinationCidrBlock: "$.detail.requestParameters.destinationCidrBlock"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🕸️ VpcId": <VpcId>,
+                "🛣️ RouteTableId": <RouteTableId>,
+                "🌉 InternetGatewayId": <InternetGatewayId>,
+                "🎯 DestinationCidrBlock": <DestinationCidrBlock>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "ec2.amazonaws.com"
+          eventName:
+            - "CreateVpcPeeringConnection"
+            - "AcceptVpcPeeringConnection"
+            - "DeleteVpcPeeringConnection"
+            - "CreateRoute"
+            - "ReplaceRoute"
+            - "DeleteRoute"
+            - "CreateInternetGateway"
+            - "AttachInternetGateway"
+            - "DetachInternetGateway"
+
+  EventRuleS3BucketPolicyChanges:
+    Type: "AWS::Events::Rule"
+    Condition: S3PolicyDetectionEnabled
+    Properties:
+      Name: !Sub "${Project}-detect-s3-bucket-policy-changes"
+      Description: !Sub "[${Project}] Monitor S3 bucket policy, ACL, and PublicAccessBlock changes (opt-in)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              BucketName: "$.detail.requestParameters.bucketName"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🪣 BucketName": <BucketName>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "s3.amazonaws.com"
+          eventName:
+            - "PutBucketPolicy"
+            - "DeleteBucketPolicy"
+            - "PutBucketAcl"
+            - "PutBucketPublicAccessBlock"
+            - "DeletePublicAccessBlock"
+
+  EventRuleLambdaChanges:
+    Type: "AWS::Events::Rule"
+    Condition: LambdaDetectionEnabled
+    Properties:
+      Name: !Sub "${Project}-detect-lambda-changes"
+      Description: !Sub "[${Project}] Monitor Lambda function creation, code updates, and permission grants (opt-in)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              FunctionName: "$.detail.requestParameters.functionName"
+              Principal: "$.detail.requestParameters.principal"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🧰 FunctionName": <FunctionName>,
+                "👤 Principal": <Principal>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "lambda.amazonaws.com"
+          # Use prefix matchers to future-proof against API version suffixes
+          # (CloudTrail records eventName as e.g. CreateFunction20150331,
+          # UpdateFunctionCode20150331v2 - new API versions silently break exact matches).
+          eventName:
+            - prefix: "CreateFunction"
+            - prefix: "UpdateFunctionCode"
+            - prefix: "AddPermission"
+            - prefix: "CreateFunctionUrlConfig"
+            - prefix: "UpdateFunctionUrlConfig"
+
+  EventRuleSSOChanges:
+    Type: "AWS::Events::Rule"
+    Condition: SSODetectionEnabled
+    Properties:
+      Name: !Sub "${Project}-detect-sso-changes"
+      Description: !Sub "[${Project}] Monitor IAM Identity Center (SSO) permission set / account assignment changes (opt-in, tenant region only)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              InstanceArn: "$.detail.requestParameters.instanceArn"
+              PermissionSetArn: "$.detail.requestParameters.permissionSetArn"
+              TargetId: "$.detail.requestParameters.targetId"
+              PrincipalId: "$.detail.requestParameters.principalId"
+              PrincipalType: "$.detail.requestParameters.principalType"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "🏢 InstanceArn": <InstanceArn>,
+                "🪪 PermissionSetArn": <PermissionSetArn>,
+                "🎯 TargetId": <TargetId>,
+                "👤 PrincipalId": <PrincipalId>,
+                "🔖 PrincipalType": <PrincipalType>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "sso.amazonaws.com"
+          eventName:
+            - "CreateAccountAssignment"
+            - "DeleteAccountAssignment"
+            - "CreatePermissionSet"
+            - "DeletePermissionSet"
+            - "UpdatePermissionSet"
+
+  EventRuleSelfProtection:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-self-stack-tampering"
+      Description: !Sub "[${Project}] Detect tampering with ASSK CloudFormation stacks (DeleteStack, UpdateTerminationProtection)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              StackName: "$.detail.requestParameters.stackName"
+            InputTemplate: |
+              {
+                "🆔 EventId": <EventId>,
+                "🕑 EventTime": <EventTime>,
+                "👉 EventName": <EventName>,
+                "🧾 EventAccountId": <EventAccountId>,
+                "🌐 EventSourceIp": <EventSourceIp>,
+                "🌏 EventRegion": <EventRegion>,
+                "👨‍🏭 EventBlame": <EventBlame>,
+                "📃 EventBlameDetails": <EventBlameDetails>,
+                "📦 StackName": <StackName>
+              }
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "cloudformation.amazonaws.com"
+          eventName:
+            - "DeleteStack"
+            - "UpdateTerminationProtection"
+          # CloudTrail records requestParameters.stackName as either the literal
+          # stack name OR a full ARN, depending on how the caller invoked the API.
+          # Match both forms via prefix + wildcard.
+          requestParameters:
+            stackName:
+              - prefix: !Sub "${Project}-"
+              - wildcard: !Sub "*:stack/${Project}-*"
+
+  SnsCmk:
+    Type: "AWS::KMS::Key"
+    Condition: SnsEncryptionEnabled
+    # Explicit Delete to honor `make tear-down`. KMS will still apply its standard
+    # 7-30 day scheduled-deletion window, so accidental deletion remains recoverable.
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Description: !Sub "[${Project}] CMK for SNS alerting topic encryption (local stack)"
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "EnableIAMUserPermissions"
+            Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+          - Sid: "AllowEventBridgeAndCloudWatchPublish"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+                - "cloudwatch.amazonaws.com"
+            Action:
+              - "kms:GenerateDataKey*"
+              - "kms:Decrypt"
+            Resource: "*"
+          - Sid: "AllowChatbotDecrypt"
+            # AWS Chatbot needs kms:Decrypt to deliver encrypted SNS messages
+            # to Slack/Teams. Without this, enabling SNS encryption silently
+            # breaks Chatbot notifications.
+            Effect: "Allow"
+            Principal:
+              Service: "chatbot.amazonaws.com"
+            Action:
+              - "kms:Decrypt"
+              - "kms:GenerateDataKey*"
+            Resource: "*"
+          - !If
+            - HasTrustedAccountIds
+            - Sid: "AllowTrustedAccountsPublish"
+              Effect: "Allow"
+              Principal:
+                AWS: !Ref TrustedAccountIds
+              Action:
+                - "kms:GenerateDataKey*"
+                - "kms:Decrypt"
+              Resource: "*"
+            - !Ref "AWS::NoValue"
+      Tags:
+        - Key: "Project"
+          Value: !Ref Project
+
+  SnsCmkAlias:
+    Type: "AWS::KMS::Alias"
+    Condition: SnsEncryptionEnabled
+    Properties:
+      AliasName: !Sub "alias/${Project}-sns-local"
+      TargetKeyId: !Ref SnsCmk
+
   CtAlertingTopic:
     # https://aws.amazon.com/premiumsupport/knowledge-center/cloudwatch-receive-sns-for-alarm-trigger/
     Type: "AWS::SNS::Topic"
     Properties:
       DisplayName: !Sub "[${AWS::AccountId}] Security Alarm"
       TopicName: !Sub "${Project}-alarm-topic-${AWS::Region}"
+      KmsMasterKeyId: !If
+        - SnsEncryptionEnabled
+        - !Ref SnsCmk
+        - !Ref "AWS::NoValue"
       Subscription:
         - Protocol: email
           Endpoint: !Ref AlarmRecipient
@@ -815,17 +1398,20 @@ Resources:
     Properties:
       PolicyDocument:
         Statement:
+          # Read + publish only for in-account principals.
+          # We intentionally do NOT grant sns:Subscribe via the topic policy:
+          # a compromised in-account principal could otherwise add an attacker
+          # email/HTTPS subscriber and silently exfiltrate every security alert.
+          # Subscribing additional recipients still works via IAM-granted
+          # sns:Subscribe (the legitimate admin flow).
+          # Destructive actions (DeleteTopic, SetTopicAttributes, AddPermission,
+          # RemovePermission) are likewise NOT granted here - they require IAM.
           - Sid: "__default_statement_ID"
             Effect: "Allow"
             Principal:
               AWS: "*"
             Action:
               - "sns:GetTopicAttributes"
-              - "sns:SetTopicAttributes"
-              - "sns:AddPermission"
-              - "sns:RemovePermission"
-              - "sns:DeleteTopic"
-              - "sns:Subscribe"
               - "sns:ListSubscriptionsByTopic"
               - "sns:Publish"
               - "sns:Receive"
