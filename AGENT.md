@@ -12,7 +12,7 @@ The goal: *"I would notice within minutes if something obviously bad happens in 
 
 1. **Free or near-free.** Everything is serverless and pay-per-use. Typical accounts pay cents per month. New features must not push that into dollars without a clear opt-in flag and a documented cost note.
 2. **No agents, no extra accounts, no SaaS.** Deploys into the account being monitored. No Lambda functions, no containers, no third-party integrations.
-3. **Actionable alerts.** Every notification is a small structured payload (event name, account, region, principal, source IP), formatted via `InputTransformer`. Never ship a rule that delivers raw CloudTrail JSON.
+3. **Actionable alerts.** Every notification is a small, human-readable plain-text message (event name, account, region, principal, source IP, plus event-specific fields), formatted via `InputTransformer`. No JSON, no emoji, no raw CloudTrail blobs.
 4. **Secure by default.** `make deploy` hardens the account before deploying the alerting stacks, and the alerting stacks themselves enable termination protection.
 5. **Complements GuardDuty.** Do not duplicate what GuardDuty already covers. Focus on tampering and high-signal events GuardDuty misses.
 
@@ -63,7 +63,7 @@ For large templates (`cfn-local.yml` is already above the 51,200-byte inline Clo
    - Prefer `prefix` matchers on `eventName` when AWS may add version suffixes (most of Lambda, some IAM).
    - Validate the pattern. EventBridge silently matches nothing for invalid patterns. (We caught a `"*.*.*.*/*"` bug this way.)
    - Use `wildcard` matchers for ARNs and other glob-like shapes.
-4. **`InputTransformer`.** Every rule MUST use the project's emoji-keyed `InputTemplate`. Look at `EventRuleConfigChanges` or `EventRuleSecurityGroupChanges` for the canonical pattern. Raw CloudTrail blobs in alerts are not acceptable.
+4. **`InputTransformer`.** Every rule MUST use the project's plain-text key/value `InputTemplate` (no JSON, no emoji). The output is a clean multi-line message: a `"[ASSK] Security alert: <EventName>"` header, a blank line, then aligned `"Label: <Var>"` lines, with `Event ID` last. Each line is wrapped in double quotes so EventBridge strips the quotes and joins the lines with newlines (the documented way to emit multi-line plain text). Keep the eight base fields (Event, Account, Region, Time, Source IP, Principal, Identity, Event ID) and append any event-specific fields between Identity and Event ID. Look at `EventRuleConfigChanges` or `EventRuleSecurityGroupChanges` for the canonical pattern. Raw CloudTrail blobs in alerts are not acceptable.
 5. **Target.** The stack's existing `CtAlertingTopic` SNS topic. Do not create per-rule topics.
 
 ### Adding a new parameter
@@ -80,7 +80,7 @@ For large templates (`cfn-local.yml` is already above the 51,200-byte inline Clo
 
 ### Account-level hardening (`account_level_security` target)
 
-- EBS default encryption, public AMI block, public snapshot block, and IMDSv2 default are **region-scoped APIs**. They must run in every enabled region, fetched via `aws ec2 describe-regions --filter Name=opt-in-status,Values=opt-in-not-required,opted-in`.
+- EBS default encryption, public AMI block, public snapshot block, IMDSv2 default, and the SSM document public-sharing block (`ssm update-service-setting --setting-id /ssm/documents/console/public-sharing-permission --setting-value Disable`) are **region-scoped APIs**. They must run in every enabled region, fetched via `aws ec2 describe-regions --filter Name=opt-in-status,Values=opt-in-not-required,opted-in`.
 - S3 Block Public Access is **account-scoped** (single call), no loop needed.
 - Per-call CLI timeouts (`--cli-connect-timeout 10 --cli-read-timeout 15`) are mandatory on every region-loop call so a down region cannot stall the loop.
 - The `SkipRegions` Make variable exists for permanent exclusions (broken regions, regions the org has intentionally disabled in spirit but not via opt-in status).
@@ -114,8 +114,12 @@ The following are deliberate non-goals. Do not add them without a separate discu
 - Per-rule fine-grained tuning UIs. Parameter overrides via the `Makefile` is the deliberate interface.
 - Multi-account orchestration. ASSK deploys per-account; multi-account is a higher-order tool's job.
 - Custom Lambda, EC2, or container infrastructure. Everything must be plain managed AWS primitives (EventBridge, SNS, CloudWatch, KMS).
+- Deploying Organizations SCPs. SCPs require the management account and are an Org-level control. ASSK may **document** self-protection SCPs in `README.md` (see "Self-protection → Lock the kit with SCPs"), but it must not deploy or manage them.
 
 ## Related issues
 
 - `#32`: original suggestions thread that motivated the latest batch of detections and hardening.
-- `#33`: tracker for 17 additional high-signal detection ideas (Persistence, Data exfiltration, Network exposure, SSO, Reconnaissance) that are not yet implemented.
+- `#33`: tracker for additional high-signal detection ideas. Partially implemented: `CreateLoginProfile` (folded into the IAM users rule), `PutKeyPolicy` (folded into the KMS rule), public Lambda URL (`AuthType: NONE`), `PutBucketReplication`, `CreateExportTask`, RDS `PubliclyAccessible`, `CreateClientVpnEndpoint`, and opt-in IAM enumeration (`EnableIamEnumerationDetection`). Remaining items still open.
+- `#35`: AWS Organizations membership events (`AccountJoinedOrganization` / `AccountDepartedOrganization`) — implemented as the opt-in `EnableOrganizationsMembershipDetection` rules in `cfn-global.yml`.
+- `#36`: account hardening — block public sharing of SSM documents (implemented in `account_level_security`).
+- `#37`: dashboards — CloudWatch widgets covering every detection in the kit (implemented in both templates' `Dashboard` resource).

@@ -51,6 +51,8 @@ EnableSSODetection ?= "false"
 EnableNetworkInfrastructureDetection ?= "false"
 EnableIamTrustPolicyDetection ?= "false"
 EnableOrganizationsDetection ?= "false"
+EnableOrganizationsMembershipDetection ?= "false"
+EnableIamEnumerationDetection ?= "false"
 
 # ---- Existing-but-noisy detections (default ON for back-compat; flip to
 # ---- "false" if alert fatigue is a problem in your environment) ----
@@ -70,11 +72,12 @@ EnableSnsEncryption ?= "false"
 TrustedAccountIds ?= ""
 #######################################################
 
-# Hardening across ALL enabled regions. The four ec2 APIs invoked here
+# Hardening across ALL enabled regions. The five APIs invoked here
 # (enable-ebs-encryption-by-default, enable-image-block-public-access,
-# enable-snapshot-block-public-access, modify-instance-metadata-defaults)
-# are REGION-SCOPED, so applying them only to LocalAWSRegion leaves every
-# other region unprotected. We loop over enabled+default-opted-in regions.
+# enable-snapshot-block-public-access, modify-instance-metadata-defaults,
+# ssm update-service-setting for public document sharing) are REGION-SCOPED,
+# so applying them only to LocalAWSRegion leaves every other region
+# unprotected. We loop over enabled+default-opted-in regions.
 # S3 Block Public Access is account-scoped and only needs to run once.
 account_level_security:
 	@echo "==> Enable S3 Block Public Access (Account Level)"
@@ -106,6 +109,9 @@ account_level_security:
 		aws ec2 modify-instance-metadata-defaults --http-tokens required --http-put-response-hop-limit 2 --region $$region ${PROFILE_FLAG} ${AwsCliTimeouts} > /dev/null 2>&1 \
 			&& echo "    ✅ IMDSv2 default" \
 			|| echo "    ⚠️  IMDSv2 default skipped"; \
+		aws ssm update-service-setting --setting-id /ssm/documents/console/public-sharing-permission --setting-value Disable --region $$region ${PROFILE_FLAG} ${AwsCliTimeouts} > /dev/null 2>&1 \
+			&& echo "    ✅ SSM document public sharing blocked" \
+			|| echo "    ⚠️  SSM document public sharing block skipped"; \
 	done
 	@echo "==> Region-scoped hardening complete"
 
@@ -151,6 +157,8 @@ deploy: account_level_security
 			AlarmRecipient=${AlarmRecipient} \
 			EnableIamTrustPolicyDetection=${EnableIamTrustPolicyDetection} \
 			EnableOrganizationsDetection=${EnableOrganizationsDetection} \
+			EnableOrganizationsMembershipDetection=${EnableOrganizationsMembershipDetection} \
+			EnableIamEnumerationDetection=${EnableIamEnumerationDetection} \
 			EnableSnsEncryption=${EnableSnsEncryption} \
 			TrustedAccountIds=${TrustedAccountIds} \
 		--no-fail-on-empty-changeset \
