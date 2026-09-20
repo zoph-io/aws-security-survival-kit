@@ -60,9 +60,6 @@ EnableGetCallerIdentityDetection ?= "true"
 EnableSecretsBatchGetDetection ?= "true"
 EnableEc2PasswordDataDetection ?= "true"
 
-# ---- Alarm tuning ----
-AccessDeniedThreshold ?= 25
-
 # ---- SNS encryption (optional CMK) ----
 # Set EnableSnsEncryption="true" to create a dedicated KMS CMK for the SNS
 # alerting topics. Cost consideration applies (KMS key + per-API-call charges).
@@ -126,7 +123,6 @@ deploy: account_level_security
 			Region=${LocalAWSRegion} \
 			AlarmRecipient=${AlarmRecipient} \
 			CTLogGroupName=${CTLogGroupName} \
-			AccessDeniedThreshold=${AccessDeniedThreshold} \
 			EnableS3PolicyDetection=${EnableS3PolicyDetection} \
 			EnableLambdaDetection=${EnableLambdaDetection} \
 			EnableSSODetection=${EnableSSODetection} \

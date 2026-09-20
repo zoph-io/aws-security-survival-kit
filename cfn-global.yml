@@ -134,6 +134,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "cloudtrail.amazonaws.com"
           eventName:
@@ -215,6 +218,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "iam.amazonaws.com"
           eventName:
@@ -235,6 +241,62 @@ Resources:
             - "PutUserPolicy"
             - "CreateLoginProfile"
             - "UpdateLoginProfile"
+
+  # Global-service counterpart of the local AccessDenied rule (IAM,
+  # Organizations, ... only surface on the us-east-1 event bus). Same
+  # rationale: email denied writes with context, never a CloudWatch
+  # threshold payload. Read-only denials stay on the local dashboard.
+  EventRuleAccessDenied:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Sub "${Project}-detect-access-denied-global"
+      Description: !Sub "[${Project}] Denied mutating global API calls (IAM/Organizations AccessDenied) with principal, IP, and error context"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventSource: "$.detail.eventSource"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              UserArn: "$.detail.userIdentity.arn"
+              ErrorCode: "$.detail.errorCode"
+              ErrorMessage: "$.detail.errorMessage"
+            InputTemplate: |
+              "[ASSK] Security alert: AccessDenied <EventName>"
+              ""
+              "Why:  Denied write. Usually IAM/SCP. Suspicious if you did not do this."
+              "Next: If unexpected, rotate this identity's credentials."
+              ""
+              "Event:     <EventName>"
+              "Service:   <EventSource>"
+              "Account:   <EventAccountId>"
+              "Region:    <EventRegion>"
+              "Time:      <EventTime>"
+              "Source IP: <EventSourceIp>"
+              "Principal: <EventBlame>"
+              "Identity:  <EventBlameDetails>"
+              "User ARN:  <UserArn>"
+              "Error:     <ErrorCode>"
+              "Message:   <ErrorMessage>"
+              "Event ID:  <EventId>"
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          readOnly:
+            - false
+          errorCode:
+            - prefix: "AccessDenied"
+            - wildcard: "*UnauthorizedOperation"
 
   EventRuleMFAChanges:
     Type: "AWS::Events::Rule"
@@ -272,6 +334,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "iam.amazonaws.com"
           eventName:
@@ -324,6 +389,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "iam.amazonaws.com"
           eventName:
@@ -372,6 +440,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "iam.amazonaws.com"
           eventName:
@@ -417,6 +488,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "organizations.amazonaws.com"
           eventName:
@@ -587,6 +661,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "cloudformation.amazonaws.com"
           eventName:
@@ -767,7 +844,8 @@ Resources:
               "properties": {
                 "metrics": [
                   [ "AWS/Events", "Invocations", "RuleName", "${Project}-detect-iam-user-changes", { "stat": "Sum", "period": 300, "label": "IAM user changes" } ],
-                  [ "...", "${Project}-detect-iam-mfa-changes", { "stat": "Sum", "period": 300, "label": "MFA changes" } ]
+                  [ "...", "${Project}-detect-iam-mfa-changes", { "stat": "Sum", "period": 300, "label": "MFA changes" } ],
+                  [ "...", "${Project}-detect-access-denied-global", { "stat": "Sum", "period": 300, "label": "AccessDenied (mutating)" } ]
                 ],
                 "view": "timeSeries",
                 "stacked": false,

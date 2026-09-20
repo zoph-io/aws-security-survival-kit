@@ -18,11 +18,6 @@ Parameters:
   Region:
     Type: String
     Description: AWS Region
-  AccessDeniedThreshold:
-    Type: Number
-    Default: 25
-    MinValue: 1
-    Description: Threshold (per evaluation period) for the Unauthorized API Call alarm. Raised from the original value of 1 to reduce alert fatigue from legitimate AccessDenied noise (SCPs, eventual consistency, etc.).
   EnableS3PolicyDetection:
     Type: String
     AllowedValues: ["true", "false"]
@@ -97,7 +92,7 @@ Resources:
             {
               "type": "text",
               "x": 0, "y": 0, "width": 24, "height": 1,
-              "properties": { "markdown": "## Metric-filter alarms" }
+              "properties": { "markdown": "## Metric-filter telemetry (AccessDenied volume) and remaining metric-filter alarms" }
             },
             {
               "height": 6, "width": 12, "y": 1, "x": 0,
@@ -198,7 +193,8 @@ Resources:
                   [ "AWS/Events", "Invocations", "RuleName", "${Project}-detect-sts-federation-token", { "stat": "Sum", "period": 300, "label": "STS GetFederationToken" } ],
                   [ "...", "${Project}-detect-rolesanywhere-changes", { "stat": "Sum", "period": 300, "label": "IAM Roles Anywhere" } ],
                   [ "...", "${Project}-detect-sts-whoami", { "stat": "Sum", "period": 300, "label": "STS GetCallerIdentity (opt-in)" } ],
-                  [ "...", "${Project}-detect-sso-changes", { "stat": "Sum", "period": 300, "label": "IAM Identity Center (opt-in)" } ]
+                  [ "...", "${Project}-detect-sso-changes", { "stat": "Sum", "period": 300, "label": "IAM Identity Center (opt-in)" } ],
+                  [ "...", "${Project}-detect-access-denied", { "stat": "Sum", "period": 300, "label": "AccessDenied (mutating)" } ]
                 ],
                 "region": "${Region}",
                 "title": "Identity / reconnaissance",
@@ -280,6 +276,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "cloudtrail.amazonaws.com"
           eventName:
@@ -324,6 +323,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "ec2.amazonaws.com"
           eventName:
@@ -431,23 +433,64 @@ Resources:
           MetricName: "UnauthorizedAttemptCount"
           DefaultValue: 0
 
-  AlarmAccessDenied:
-    Type: "AWS::CloudWatch::Alarm"
+  # Replaces the old UnauthorizedAttemptCount CloudWatch alarm.
+  # That alarm emailed a threshold-crossed payload (no principal, API, IP, or
+  # error) and counted every AccessDenied in CloudTrail Logs, including the
+  # Describe/Get/List noise that dominates real accounts. EventBridge in the
+  # default ENABLED state only receives mutating management events, so this
+  # rule is inherently write-only: you get a contextual SNS message for a
+  # denied change, and the dashboard still graphs full AccessDenied volume.
+  EventRuleAccessDenied:
+    Type: "AWS::Events::Rule"
     Properties:
-      ActionsEnabled: true
-      AlarmName: !Sub "Unauthorized API Call [${Project}]"
-      AlarmActions:
-        - !Ref CtAlertingTopic
-      AlarmDescription: >
-        Alarm on Unauthorized API Call - threshold configurable via AccessDeniedThreshold parameter (default 25 to reduce noise from legitimate AccessDenied events such as SCP blocks and eventual consistency).
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 2
-      MetricName: "UnauthorizedAttemptCount"
-      Namespace: "CloudTrailMetrics"
-      Period: 3600
-      Statistic: Sum
-      Threshold: !Ref AccessDeniedThreshold
-      TreatMissingData: "notBreaching"
+      Name: !Sub "${Project}-detect-access-denied"
+      Description: !Sub "[${Project}] Denied mutating API calls (AccessDenied / UnauthorizedOperation) with principal, IP, and error context"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Ref: CtAlertingTopic
+          Id: CtAlertingTopic
+          InputTransformer:
+            InputPathsMap:
+              EventId: "$.id"
+              EventTime: "$.detail.eventTime"
+              EventName: "$.detail.eventName"
+              EventSource: "$.detail.eventSource"
+              EventAccountId: "$.account"
+              EventSourceIp: "$.detail.sourceIPAddress"
+              EventRegion: "$.region"
+              EventBlame: "$.detail.userIdentity.principalId"
+              EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
+              UserArn: "$.detail.userIdentity.arn"
+              ErrorCode: "$.detail.errorCode"
+              ErrorMessage: "$.detail.errorMessage"
+            InputTemplate: |
+              "[ASSK] Security alert: AccessDenied <EventName>"
+              ""
+              "Why:  Denied write. Usually IAM/SCP. Suspicious if you did not do this."
+              "Next: If unexpected, rotate this identity's credentials."
+              ""
+              "Event:     <EventName>"
+              "Service:   <EventSource>"
+              "Account:   <EventAccountId>"
+              "Region:    <EventRegion>"
+              "Time:      <EventTime>"
+              "Source IP: <EventSourceIp>"
+              "Principal: <EventBlame>"
+              "Identity:  <EventBlameDetails>"
+              "User ARN:  <UserArn>"
+              "Error:     <ErrorCode>"
+              "Message:   <ErrorMessage>"
+              "Event ID:  <EventId>"
+      EventPattern:
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          readOnly:
+            - false
+          errorCode:
+            - prefix: "AccessDenied"
+            - wildcard: "*UnauthorizedOperation"
 
   AlarmConsoleFailedAuth:
     Type: "AWS::CloudWatch::Alarm"
@@ -538,6 +581,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "kms.amazonaws.com"
           eventName:
@@ -586,6 +632,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "ec2.amazonaws.com"
           eventName:
@@ -627,6 +676,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "config.amazonaws.com"
           eventName:
@@ -672,6 +724,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "ec2.amazonaws.com"
           eventName:
@@ -803,6 +858,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "route53resolver.amazonaws.com"
           eventName:
@@ -853,6 +911,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "ec2.amazonaws.com"
           eventName:
@@ -909,6 +970,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "ec2.amazonaws.com"
           eventName:
@@ -961,6 +1025,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "rolesanywhere.amazonaws.com"
           eventName:
@@ -1006,6 +1073,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "sts.amazonaws.com"
           eventName:
@@ -1048,6 +1118,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "guardduty.amazonaws.com"
           eventName:
@@ -1095,6 +1168,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "guardduty.amazonaws.com"
           eventName:
@@ -1147,6 +1223,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "ec2.amazonaws.com"
           eventName:
@@ -1198,6 +1277,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "s3.amazonaws.com"
           eventName:
@@ -1247,6 +1329,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "lambda.amazonaws.com"
           # Use prefix matchers to future-proof against API version suffixes
@@ -1305,6 +1390,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "sso.amazonaws.com"
           eventName:
@@ -1351,6 +1439,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "cloudformation.amazonaws.com"
           eventName:
@@ -1403,6 +1494,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "lambda.amazonaws.com"
           # Prefix matchers future-proof against API version suffixes; the
@@ -1451,6 +1545,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "s3.amazonaws.com"
           eventName:
@@ -1495,6 +1592,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "logs.amazonaws.com"
           eventName:
@@ -1537,6 +1637,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "rds.amazonaws.com"
           eventName:
@@ -1581,6 +1684,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "ec2.amazonaws.com"
           eventName:

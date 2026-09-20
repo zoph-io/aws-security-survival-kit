@@ -11,7 +11,7 @@ AWS gives you excellent logging (CloudTrail, VPC Flow Logs, Config) but very few
 - A new IAM user was created, or `AdministratorAccess` was attached to a role.
 - A security group was opened on port 22 to `0.0.0.0/0`.
 - A snapshot or AMI was shared with another AWS account.
-- A flood of `AccessDenied` errors is happening (enumeration, misconfigured workload, compromised credential probing).
+- A mutating API call was denied (`AccessDenied` / `UnauthorizedOperation`) — credential probing, privilege-escalation attempts, or a misconfigured workload. Read-only denials (`Describe` / `Get` / `List`) stay on the dashboard instead of the inbox.
 - Your own monitoring stack just got deleted.
 
 ASSK is the minimum so that *"I would notice within minutes if something obviously bad happens"* is true for your AWS account. It complements GuardDuty. It is not a SIEM, a SOAR, or a full detection engineering practice.
@@ -36,7 +36,7 @@ make deploy
 ## What it watches
 
 <details>
-<summary><b>Always-on detections</b> (CloudWatch alarms and EventBridge rules)</summary>
+<summary><b>Always-on detections</b> (EventBridge rules and two remaining CloudWatch alarms)</summary>
 
 1. Root user activity
 2. CloudTrail tampering (`StopLogging`, `DeleteTrail`, `UpdateTrail`)
@@ -44,7 +44,7 @@ make deploy
 4. IAM user changes (`Create`, `Delete`, `Update`, `CreateAccessKey`, `CreateLoginProfile`, `UpdateLoginProfile`, ...)
 5. IAM admin escalation (`Attach*Policy` with `AdministratorAccess`)
 6. MFA changes (`CreateVirtualMFADevice`, `DeactivateMFADevice`, `DeleteVirtualMFADevice`, ...)
-7. AccessDenied / UnauthorizedOperation burst (alarm, threshold configurable, see Parameters)
+7. AccessDenied / UnauthorizedOperation on **mutating** APIs (EventBridge, with principal / IP / error / rationale). Read-only denials are graphed on the dashboard only — they are the usual source of alert fatigue (SCP blocks, console clicks, IAM eventual consistency).
 8. Console login failures (alarm)
 9. EBS snapshot exfiltration (`ModifySnapshotAttribute`, `SharedSnapshotCopyInitiated`, `SharedSnapshotVolumeCreated`)
 10. AMI exfiltration (`ModifyImageAttribute`)
@@ -126,17 +126,24 @@ The region loop uses `aws ec2 describe-regions` with `opt-in-status in (opt-in-n
 | --- | --- |
 | `AlarmRecipient` | Email address that receives alerts. |
 | `Project` | Stack-name prefix (also matched by the self-protection rule). Default `aws-security-survival-kit`. |
-| `LocalAWSRegion` | Region where the CloudTrail CloudWatch Logs `LogGroup` lives. Metric-filter alarms (AccessDenied, Failed Console Login, IMDSv1) are evaluated here. EventBridge rules in `cfn-local.yml` are deployed here. |
+| `LocalAWSRegion` | Region where the CloudTrail CloudWatch Logs `LogGroup` lives. Metric-filter alarms (Failed Console Login, IMDSv1) and the AccessDenied volume graph are evaluated here. EventBridge rules in `cfn-local.yml` are deployed here. |
 | `CTLogGroupName` | CloudTrail CloudWatch Logs `LogGroup` name. Required. |
 
 </details>
 
 <details>
-<summary><b>Tuning</b></summary>
+<summary><b>AccessDenied alerting</b></summary>
 
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `AccessDeniedThreshold` | `25` | Threshold for the AccessDenied alarm. Evaluated as `Period=3600s, EvaluationPeriods=2, Statistic=Sum`, so it fires when this many events or more occur in each of two consecutive 1-hour windows. Raised from the original `1` to absorb legitimate noise (SCP blocks, eventual-consistency lookups, idempotent retries). |
+CloudWatch metric-filter alarms cannot include the CloudTrail event (who, which API, which error). The old `Unauthorized API Call` alarm therefore emailed a threshold-crossed payload with no way to triage it, while counting every `AccessDenied` in the log group — including `Describe*` / `Get*` / `List*` noise. That combination is how you train people to ignore the inbox.
+
+ASSK now:
+
+- **Emails** denied **mutating** management APIs via EventBridge (`State: ENABLED` only receives writes; `errorCode` prefix `AccessDenied` or `*UnauthorizedOperation`). The body includes principal, ARN, source IP, the AWS error, and a one-line why/next.
+- **Graphs** full AccessDenied volume (reads + writes) on the local dashboard, with a Logs Insights table (`Latest Access Denied Events`) for hunting.
+- **Does not** email read-only denials. Those dominate real accounts and are almost never actionable by themselves.
+- Dedicated mutating rules (`PutKeyPolicy`, `CreateUser`, `StopLogging`, ...) match **successes only** (`errorCode` exists: false). A denial of those APIs used to look like a successful change and duplicate the AccessDenied email. IAM / Organizations denials are matched in `us-east-1` (`cfn-global.yml`); everything else is matched in `LocalAWSRegion`.
+
+The `AccessDeniedThreshold` parameter is gone. There is nothing useful to tune on a counter that has no event context.
 
 </details>
 
@@ -296,7 +303,29 @@ Identity:  my-admin-role
 Event ID:  a1b2c3d4-5678-90ab-cdef-EXAMPLE
 ```
 
-Rules that carry extra context add it between `Identity` and `Event ID` (for example `KeyId`, `BucketName`, `GroupId`, `StackName`). The same plain-text body is what AWS Chatbot renders into Slack / Teams.
+Rules that carry extra context add it between `Identity` and `Event ID` (for example `KeyId`, `BucketName`, `GroupId`, `StackName`). AccessDenied alerts add a `Why` / `Next` block under the header so the email is triaged without opening the console. The same plain-text body is what AWS Chatbot renders into Slack / Teams.
+
+Example AccessDenied body:
+
+```
+[ASSK] Security alert: AccessDenied CreateUser
+
+Why:  Denied write. Usually IAM/SCP. Suspicious if you did not do this.
+Next: If unexpected, rotate this identity's credentials.
+
+Event:     CreateUser
+Service:   iam.amazonaws.com
+Account:   123456789012
+Region:    us-east-1
+Time:      2026-09-20T16:20:00Z
+Source IP: 203.0.113.10
+Principal: AROAEXAMPLE123:session
+Identity:  my-admin-role
+User ARN:  arn:aws:sts::123456789012:assumed-role/my-admin-role/session
+Error:     AccessDenied
+Message:   User: arn:aws:sts::... is not authorized to perform: iam:CreateUser
+Event ID:  a1b2c3d4-5678-90ab-cdef-EXAMPLE
+```
 
 Two delivery caveats are inherent to SNS email and apply regardless of formatting: the body is plain text only (no HTML, bold, or links), and the email subject line stays the generic "AWS Notification Message" because EventBridge cannot set the SNS subject. Customizing either would require SES or a Lambda, both of which are deliberately out of scope.
 
@@ -308,7 +337,7 @@ Set up [AWS Chatbot](https://aws.amazon.com/chatbot/) to get notified directly o
 
 ASSK ships two CloudWatch dashboards for at-a-glance visibility on suspicious activity:
 
-- **`AWS-Security-Survival-Kit-Dashboard-<region>`** (Local stack) — metric-filter alarm graphs (Access Denied, failed console logins, IMDSv1 launches), plus EventBridge rule-invocation graphs grouped by category (*defense evasion / detection tampering*, *data exfiltration*, *network exposure*, *identity / reconnaissance*), plus CloudWatch Logs Insights tables for fast triage (latest Access Denied events, recent IMDSv1 launches, CloudTrail changes).
+- **`AWS-Security-Survival-Kit-Dashboard-<region>`** (Local stack) — AccessDenied volume graph (telemetry, not an inbox alarm), metric-filter alarm graphs (failed console logins, IMDSv1 launches), plus EventBridge rule-invocation graphs grouped by category (*defense evasion / detection tampering*, *data exfiltration*, *network exposure*, *identity / reconnaissance*), plus CloudWatch Logs Insights tables for fast triage (latest Access Denied events, recent IMDSv1 launches, CloudTrail changes).
 - **`AWS-Security-Survival-Kit-Dashboard-Global`** (Global stack, `us-east-1`) — an all-rules overview plus rule-invocation graphs for *root & privileged identity*, *IAM users & MFA*, *account & org tampering*, and *AWS Health*.
 
 Every detection shipped by the kit appears on a dashboard. Rule-invocation widgets read the `AWS/Events` `Invocations` metric per rule, so a **flat line at zero means the detection is armed and nothing matched** (the metric only materializes after a rule first fires). Opt-in detections (`Enable*Detection`) only report data once enabled.
