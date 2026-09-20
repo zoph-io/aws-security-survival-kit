@@ -138,11 +138,10 @@ CloudWatch metric-filter alarms cannot include the CloudTrail event (who, which 
 
 ASSK now:
 
-- **Emails** denied **mutating** management APIs via EventBridge (`State: ENABLED` only receives writes; `errorCode` prefix `AccessDenied` or `*UnauthorizedOperation`). The body includes principal, ARN, source IP, user agent, error message, why it matters, and where to look next.
+- **Emails** denied **mutating** management APIs via EventBridge (`State: ENABLED` only receives writes; `errorCode` prefix `AccessDenied` or `*UnauthorizedOperation`). The body includes principal, ARN, source IP, the AWS error, and a one-line why/next.
 - **Graphs** full AccessDenied volume (reads + writes) on the local dashboard, with a Logs Insights table (`Latest Access Denied Events`) for hunting.
 - **Does not** email read-only denials. Those dominate real accounts and are almost never actionable by themselves.
-
-A denied API that already has a dedicated rule (for example `CreateUser`) may produce two emails. The AccessDenied email is the one that includes the error and the rationale. IAM / Organizations denials are matched in `us-east-1` (`cfn-global.yml`); everything else is matched in `LocalAWSRegion`.
+- Dedicated mutating rules (`PutKeyPolicy`, `CreateUser`, `StopLogging`, ...) match **successes only** (`errorCode` exists: false). A denial of those APIs used to look like a successful change and duplicate the AccessDenied email. IAM / Organizations denials are matched in `us-east-1` (`cfn-global.yml`); everything else is matched in `LocalAWSRegion`.
 
 The `AccessDeniedThreshold` parameter is gone. There is nothing useful to tune on a counter that has no event context.
 
@@ -311,12 +310,8 @@ Example AccessDenied body:
 ```
 [ASSK] Security alert: AccessDenied CreateUser
 
-Why:       A write API was denied. Often IAM/SCP misconfig or a missing
-           permission. Unknown principal/IP, or repeats against IAM,
-           CloudTrail, GuardDuty, or KMS, can mean probing or priv-esc.
-Next:      If unexpected, rotate this identity's credentials and review
-           Latest Access Denied Events on dashboard
-           AWS-Security-Survival-Kit-Dashboard-eu-west-1.
+Why:  Denied write. Usually IAM/SCP. Suspicious if you did not do this.
+Next: If unexpected, rotate this identity's credentials.
 
 Event:     CreateUser
 Service:   iam.amazonaws.com
@@ -327,8 +322,6 @@ Source IP: 203.0.113.10
 Principal: AROAEXAMPLE123:session
 Identity:  my-admin-role
 User ARN:  arn:aws:sts::123456789012:assumed-role/my-admin-role/session
-User type: AssumedRole
-Agent:     aws-cli/2.x
 Error:     AccessDenied
 Message:   User: arn:aws:sts::... is not authorized to perform: iam:CreateUser
 Event ID:  a1b2c3d4-5678-90ab-cdef-EXAMPLE

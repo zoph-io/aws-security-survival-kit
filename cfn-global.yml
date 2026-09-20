@@ -134,6 +134,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "cloudtrail.amazonaws.com"
           eventName:
@@ -215,6 +218,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "iam.amazonaws.com"
           eventName:
@@ -262,19 +268,13 @@ Resources:
               EventBlame: "$.detail.userIdentity.principalId"
               EventBlameDetails: "$.detail.userIdentity.sessionContext.sessionIssuer.userName"
               UserArn: "$.detail.userIdentity.arn"
-              UserType: "$.detail.userIdentity.type"
-              UserAgent: "$.detail.userAgent"
               ErrorCode: "$.detail.errorCode"
               ErrorMessage: "$.detail.errorMessage"
             InputTemplate: |
               "[ASSK] Security alert: AccessDenied <EventName>"
               ""
-              "Why:       A write API was denied. Often IAM/SCP misconfig or a missing"
-              "           permission. Unknown principal/IP, or repeats against IAM,"
-              "           CloudTrail, GuardDuty, or KMS, can mean probing or priv-esc."
-              "Next:      If unexpected, rotate this identity's credentials and review"
-              "           Latest Access Denied Events on dashboard"
-              "           AWS-Security-Survival-Kit-Dashboard-Global."
+              "Why:  Denied write. Usually IAM/SCP. Suspicious if you did not do this."
+              "Next: If unexpected, rotate this identity's credentials."
               ""
               "Event:     <EventName>"
               "Service:   <EventSource>"
@@ -285,8 +285,6 @@ Resources:
               "Principal: <EventBlame>"
               "Identity:  <EventBlameDetails>"
               "User ARN:  <UserArn>"
-              "User type: <UserType>"
-              "Agent:     <UserAgent>"
               "Error:     <ErrorCode>"
               "Message:   <ErrorMessage>"
               "Event ID:  <EventId>"
@@ -336,6 +334,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "iam.amazonaws.com"
           eventName:
@@ -388,6 +389,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "iam.amazonaws.com"
           eventName:
@@ -436,6 +440,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "iam.amazonaws.com"
           eventName:
@@ -481,6 +488,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "organizations.amazonaws.com"
           eventName:
@@ -651,6 +661,9 @@ Resources:
         detail-type:
           - "AWS API Call via CloudTrail"
         detail:
+          # Success-only: denials go to EventRuleAccessDenied.
+          errorCode:
+            - exists: false
           eventSource:
             - "cloudformation.amazonaws.com"
           eventName:
